@@ -47,7 +47,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_verified=models.BooleanField(_("verified"), default=False)
     is_staff=models.BooleanField(_("Staff"), default=False)
     is_active=models.BooleanField(_("Avtive"), default=True)
-    date_joined=models.BooleanField(_("date joined"), default=timezone.now)
+    date_joined=models.DateTimeField(_("date joined"), default=timezone.now)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)
 

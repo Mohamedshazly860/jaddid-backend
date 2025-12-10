@@ -30,13 +30,11 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('email', 'password')
         }),
         (_('Personal info'), {
-            'fields': ('first_name', 'last_name', 'language_preference')
+            'fields': ('first_name', 'last_name')
         }),
         (_('Role & Permissions'), {
             'fields': (
                 'role',
-                'can_sell',
-                'can_buy',
                 'is_verified'
             )
         }),
