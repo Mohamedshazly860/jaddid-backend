@@ -243,7 +243,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'id', 'title', 'title_ar', 'price', 'quantity', 'unit',
+            'id', 'title', 'title_ar', 'price', 'quantity',
             'condition', 'status', 'location', 'seller_name', 
             'seller_email', 'category_name', 'primary_image',
             'views_count', 'favorites_count', 'is_favorited',
@@ -281,7 +281,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'seller', 'category', 'title', 'title_ar',
             'description', 'description_ar', 'price', 'quantity',
-            'unit', 'condition', 'status', 'location', 'latitude',
+            'condition', 'status', 'location', 'latitude',
             'longitude', 'images', 'views_count', 'favorites_count',
             'is_favorited', 'average_rating', 'review_count',
             'created_at', 'updated_at', 'published_at'
@@ -329,7 +329,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'category', 'title', 'title_ar', 'description',
-            'description_ar', 'price', 'quantity', 'unit', 'condition',
+            'description_ar', 'price', 'quantity', 'condition',
             'status', 'location', 'latitude', 'longitude', 'images',
             'uploaded_images'
         ]
@@ -507,7 +507,7 @@ class OrderSerializer(serializers.ModelSerializer):
             validated_data['order_type'] = Order.PRODUCT
             validated_data['unit_price'] = product.price
             if 'unit' not in validated_data:
-                validated_data['unit'] = product.unit
+                validated_data['unit'] = 'piece'  # Products are sold as pieces
         
         elif material_listing_id:
             material_listing = MaterialListing.objects.get(id=material_listing_id)

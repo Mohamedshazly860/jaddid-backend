@@ -326,18 +326,14 @@ class Product(models.Model):
         _("Price"),
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)]
+        validators=[MinValueValidator(0)],
+        help_text=_("Fixed price per item")
     )
     quantity = models.PositiveIntegerField(
         _("Quantity"),
         default=1,
-        validators=[MinValueValidator(1)]
-    )
-    unit = models.CharField(
-        _("Unit"),
-        max_length=50,
-        default='kg',
-        help_text=_("Unit of measurement (kg, ton, piece, etc.)")
+        validators=[MinValueValidator(1)],
+        help_text=_("Number of items available (stock)")
     )
     
     # Product Details
