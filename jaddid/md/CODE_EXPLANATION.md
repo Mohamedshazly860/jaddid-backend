@@ -1,17 +1,48 @@
 # شرح مفصل للكود - Detailed Code Explanation
 # توثيق تقني كامل لتطبيق Marketplace
 
+**آخر تحديث: ديسمبر 2025**
+
 ---
 
 ## 📋 فهرس المحتويات - Table of Contents
 
-1. [Models - النماذج](#models)
-2. [Serializers - المسلسلات](#serializers)
-3. [Views - طبقة العرض](#views)
-4. [Admin - لوحة الإدارة](#admin)
-5. [Permissions - الصلاحيات](#permissions)
-6. [URLs - المسارات](#urls)
-7. [Settings Configuration - إعدادات المشروع](#settings)
+1. [نظرة عامة - Overview](#overview)
+2. [Models - النماذج](#models)
+3. [Serializers - المسلسلات](#serializers)
+4. [Views - طبقة العرض](#views)
+5. [Admin - لوحة الإدارة](#admin)
+6. [Permissions - الصلاحيات](#permissions)
+7. [URLs - المسارات](#urls)
+8. [Settings Configuration - إعدادات المشروع](#settings)
+
+---
+
+## 📊 نظرة عامة - Overview {#overview}
+
+### نظام مزدوج للتعامل مع المواد القابلة لإعادة التدوير
+
+التطبيق يدعم نوعين من العناصر:
+
+#### 1️⃣ **Materials System** (نظام المواد الخام)
+- **Master Data**: قائمة موحدة للمواد (خشب، بلاستيك، ورق، معادن)
+- **Material Listings**: إعلانات البائعين للمواد الخام
+- **Use Case**: شراء كميات كبيرة من المواد الخام لإعادة التدوير
+
+#### 2️⃣ **Products System** (نظام المنتجات)
+- **Direct Listings**: منتجات فردية للبيع المباشر
+- **Use Case**: بيع منتجات معاد تدويرها أو منتجات مستعملة
+
+### الفرق بين Material و Product
+
+| Feature | Material | Product |
+|---------|----------|---------|
+| **البيانات الأساسية** | من Master Data | بيانات حرة |
+| **التسعير** | سعر لكل وحدة (kg/ton) | سعر إجمالي |
+| **الكمية** | DecimalField (دقيق) | Integer (عدد صحيح) |
+| **الاستخدام** | تجاري، كميات كبيرة | فردي، منتجات محددة |
+
+---
 
 ---
 
@@ -25,14 +56,30 @@
 
 ### 🔸 Model 1: Category (الفئات)
 
+**الهدف:** تصنيف كل من Materials و Products
+
 ```python
 class Category(models.Model):
+    """Product Category Model for organizing recyclable materials"""
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_("Category Name"), max_length=100, unique=True)
     name_ar = models.CharField(_("Arabic Name"), max_length=100, blank=True)
     description = models.TextField(_("Description"), blank=True)
-    icon = models.ImageField(upload_to="categories/%Y/%m/", null=True, blank=True)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name='subcategories')
+    icon = models.ImageField(
+        _("Category Icon"), 
+        upload_to="categories/%Y/%m/", 
+        null=True, 
+        blank=True
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        related_name='subcategories',
+        null=True,
+        blank=True,
+        verbose_name=_("Parent Category")
+    )
     is_active = models.BooleanField(_("Active"), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
