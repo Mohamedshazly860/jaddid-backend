@@ -3,14 +3,55 @@
 
 ---
 
+> **🆕 NEW FEATURE:** Materials are now separated from Products!  
+> **ميزة جديدة:** تم فصل المواد الخام عن المنتجات!  
+> See [MATERIALS_IMPLEMENTATION.md](MATERIALS_IMPLEMENTATION.md) for details.
+
+---
+
 ## English Documentation
 
 ### Overview
-The **Jaddid Marketplace** app is a comprehensive Django REST Framework application designed for buying and selling recyclable materials. It provides a complete marketplace solution with product listings, orders, reviews, messaging, and reporting features.
+The **Jaddid Marketplace** app is a comprehensive Django REST Framework application designed for buying and selling recyclable materials. It now includes **two separate marketplaces**:
+
+1. **Materials Marketplace** - For raw materials sold by weight/quantity (wood chips, plastic, metal, etc.)
+2. **Products Marketplace** - For handmade/manufactured items from recycled materials
+
+The app provides a complete solution with listings, orders, reviews, messaging, and reporting features that work for both materials and products.
 
 ### Features Implemented
 
-#### 1. **Models** (8 Core Models)
+#### 1. **Models** (11 Core Models - Updated!)
+
+##### Category Model
+- Hierarchical category structure for organizing recyclable materials **and** raw materials
+- Support for parent-child relationships
+- Bilingual support (English & Arabic)
+- Icon/image support for categories
+
+##### 🆕 Material Model (NEW!)
+- Master data for raw material types
+- Bilingual support (English & Arabic)
+- Default unit configuration (kg, ton, bag, cubic meter, etc.)
+- Icon/image support
+- Linked to categories
+
+##### 🆕 MaterialListing Model (NEW!)
+- User listings for selling raw materials
+- Quantity and price per unit system
+- Minimum order quantity support
+- Condition tracking (Excellent, Good, Acceptable, Poor)
+- Status management (Draft, Active, Sold, Reserved, Deleted)
+- Location with GPS coordinates
+- Availability date ranges
+- View and favorite counters
+
+##### 🆕 MaterialImage Model (NEW!)
+- Multiple images per material listing
+- Primary image designation
+- Image ordering support
+
+##### Product Model
 
 ##### Category Model
 - Hierarchical category structure for organizing recyclable materials
@@ -33,51 +74,96 @@ The **Jaddid Marketplace** app is a comprehensive Django REST Framework applicat
 - Image ordering support
 - Automatic organization by date
 
-##### Favorite Model
+##### Favorite Model (Updated!)
 - User wishlist/favorites functionality
-- Unique constraint per user-product combination
+- 🆕 **Now supports both Products AND Material Listings**
+- Unique constraints for both types
 - Fast lookups with database indexes
 
-##### Order Model
+##### Order Model (Updated!)
 - Complete order management system
-- Auto-generated unique order numbers
+- Auto-generated unique order numbers (PRD-xxx for products, MAT-xxx for materials)
+- 🆕 **Supports both Products AND Material Listings**
+- 🆕 **Order type field** to distinguish between product and material orders
 - Order status tracking (Pending, Confirmed, In Progress, Completed, Cancelled, Refunded)
 - Payment status tracking (Unpaid, Paid, Partial)
 - Automatic total price calculation
+- Unit and quantity tracking
 - Delivery address support
 
-##### Review Model
+##### Review Model (Updated!)
 - 5-star rating system
+- 🆕 **Now supports reviews for both Products AND Material Listings**
 - Verified purchase indicator
 - Admin approval system
 - Title and comment fields
 - Linked to orders for purchase verification
 
-##### Message Model
+##### Message Model (Updated!)
 - Direct messaging between buyers and sellers
-- Product-specific conversations
+- 🆕 **Supports conversations about both Products AND Material Listings**
 - Read/unread status tracking
 - Subject and message body
 
-##### Report Model
+##### Report Model (Updated!)
 - Content moderation system
+- 🆕 **Can report both Products AND Material Listings**
 - Multiple report reasons (Spam, Inappropriate, Fraud, Duplicate, Other)
 - Status tracking (Pending, Reviewing, Resolved, Dismissed)
 - Admin notes and resolution tracking
 
-#### 2. **Serializers** (10 Serializers)
+#### 2. **Serializers** (15 Serializers - Updated!)
+
+**New Material Serializers:**
+- **MaterialSerializer**: Material master data
+- **MaterialImageSerializer**: Material listing images
+- **MaterialListingListSerializer**: Lightweight for list views
+- **MaterialListingDetailSerializer**: Complete listing information
+- **MaterialListingCreateUpdateSerializer**: Listing creation/editing with image upload
+
+**Existing Serializers (All Updated to Support Both Types):**
 - **CategorySerializer**: Full category data with subcategories
 - **ProductListSerializer**: Lightweight for list views
 - **ProductDetailSerializer**: Complete product information
 - **ProductCreateUpdateSerializer**: Product creation/editing with image upload
 - **ProductImageSerializer**: Image management
-- **FavoriteSerializer**: Wishlist management
-- **OrderSerializer**: Order processing
-- **ReviewSerializer**: Review submission
-- **MessageSerializer**: Messaging functionality
-- **ReportSerializer**: Content reporting
+- **FavoriteSerializer**: Wishlist management (🆕 supports both types)
+- **OrderSerializer**: Order processing (🆕 supports both types)
+- **ReviewSerializer**: Review submission (🆕 supports both types)
+- **MessageSerializer**: Messaging functionality (🆕 supports both types)
+- **ReportSerializer**: Content reporting (🆕 supports both types)
 
-#### 3. **ViewSets & API Endpoints** (7 ViewSets)
+#### 3. **ViewSets & API Endpoints** (9 ViewSets - Updated!)
+
+🆕 **New Material ViewSets:**
+
+##### MaterialViewSet
+- `GET /api/marketplace/materials/` - List all materials
+- `GET /api/marketplace/materials/{id}/` - Material details
+- `GET /api/marketplace/materials/{id}/listings/` - Get listings for material
+- `POST /api/marketplace/materials/` - Create material (admin)
+- `PUT/PATCH /api/marketplace/materials/{id}/` - Update material (admin)
+- `DELETE /api/marketplace/materials/{id}/` - Delete material (admin)
+
+##### MaterialListingViewSet
+- `GET /api/marketplace/material-listings/` - List all active listings
+- `GET /api/marketplace/material-listings/{id}/` - Listing details (increments view count)
+- `GET /api/marketplace/material-listings/my_listings/` - User's own listings
+- `POST /api/marketplace/material-listings/` - Create listing
+- `PUT/PATCH /api/marketplace/material-listings/{id}/` - Update listing (owner only)
+- `DELETE /api/marketplace/material-listings/{id}/` - Delete listing (owner only)
+- `POST /api/marketplace/material-listings/{id}/toggle_favorite/` - Add/remove favorite
+- `GET /api/marketplace/material-listings/{id}/reviews/` - Listing reviews
+- `POST /api/marketplace/material-listings/{id}/publish/` - Publish draft listing
+
+**Filtering & Search:**
+- Filter by: material, condition, status, seller, price range, quantity range
+- Search in: title, description, location, material name
+- Order by: price_per_unit, quantity, created_at, views_count, favorites_count
+
+---
+
+**Existing ViewSets (Unchanged):**
 
 ##### CategoryViewSet
 - `GET /api/marketplace/categories/` - List all categories

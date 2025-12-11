@@ -1,9 +1,17 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
-    Category, Product, ProductImage, Favorite,
+    Category, Material, MaterialListing, MaterialImage,
+    Product, ProductImage, Favorite,
     Order, Review, Message, Report
 )
+
+
+class MaterialImageInline(admin.TabularInline):
+    """Inline admin for material listing images"""
+    model = MaterialImage
+    extra = 1
+    fields = ['image', 'is_primary', 'order']
 
 
 class ProductImageInline(admin.TabularInline):
@@ -34,6 +42,110 @@ class CategoryAdmin(admin.ModelAdmin):
     def product_count(self, obj):
         return obj.products.filter(status='active').count()
     product_count.short_description = 'Active Products'
+
+
+@admin.register(Material)
+class MaterialAdmin(admin.ModelAdmin):
+    """Admin for Material (Master Data) model"""
+    list_display = ['name', 'name_ar', 'category', 'default_unit', 'is_active', 'listing_count', 'created_at']
+    list_filter = ['is_active', 'category', 'created_at']
+    search_fields = ['name', 'name_ar', 'description']
+    ordering = ['name']
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'name_ar', 'description', 'description_ar', 'icon')
+        }),
+        ('Category & Unit', {
+            'fields': ('category', 'default_unit')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+    )
+    
+    def listing_count(self, obj):
+        return obj.listings.filter(status='active').count()
+    listing_count.short_description = 'Active Listings'
+
+
+@admin.register(MaterialListing)
+class MaterialListingAdmin(admin.ModelAdmin):
+    """Admin for Material Listing model"""
+    list_display = [
+        'title', 'material', 'seller_info', 'quantity', 'unit',
+        'price_per_unit', 'total_price_display', 'condition', 'status',
+        'views_count', 'favorites_count', 'created_at'
+    ]
+    list_filter = [
+        'status', 'condition', 'material', 'created_at', 'published_at'
+    ]
+    search_fields = ['title', 'title_ar', 'description', 'location', 'seller__email', 'material__name']
+    ordering = ['-created_at']
+    list_per_page = 50
+    inlines = [MaterialImageInline]
+    readonly_fields = ['total_price', 'views_count', 'favorites_count', 'created_at', 'updated_at', 'published_at']
+    
+    fieldsets = (
+        ('Seller Information', {
+            'fields': ('seller',)
+        }),
+        ('Material Information', {
+            'fields': (
+                'material', 'title', 'title_ar', 'description', 'description_ar'
+            )
+        }),
+        ('Quantity & Pricing', {
+            'fields': ('quantity', 'unit', 'price_per_unit', 'total_price', 'minimum_order_quantity')
+        }),
+        ('Details', {
+            'fields': ('condition', 'status')
+        }),
+        ('Location', {
+            'fields': ('location', 'latitude', 'longitude')
+        }),
+        ('Availability', {
+            'fields': ('available_from', 'available_until', 'notes')
+        }),
+        ('Metrics', {
+            'fields': ('views_count', 'favorites_count'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at', 'published_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def seller_info(self, obj):
+        return format_html(
+            '<a href="/admin/accounts/user/{}/change/">{}</a>',
+            obj.seller.id,
+            obj.seller.email
+        )
+    seller_info.short_description = 'Seller'
+    
+    def total_price_display(self, obj):
+        return f'{obj.total_price:.2f}'
+    total_price_display.short_description = 'Total Price'
+    
+    actions = ['make_active', 'make_draft', 'make_sold']
+    
+    def make_active(self, request, queryset):
+        updated = queryset.update(status='active')
+        self.message_user(request, f'{updated} listings marked as active.')
+    make_active.short_description = 'Mark selected listings as active'
+    
+    def make_draft(self, request, queryset):
+        updated = queryset.update(status='draft')
+        self.message_user(request, f'{updated} listings marked as draft.')
+    make_draft.short_description = 'Mark selected listings as draft'
+    
+    def make_sold(self, request, queryset):
+        updated = queryset.update(status='sold')
+        self.message_user(request, f'{updated} listings marked as sold.')
+    make_sold.short_description = 'Mark selected listings as sold'
 
 
 @admin.register(Product)
@@ -127,9 +239,12 @@ class ProductImageAdmin(admin.ModelAdmin):
 @admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):
     """Admin for Favorite model"""
-    list_display = ['user_info', 'product', 'created_at']
+    list_display = ['user_info', 'item_type_display', 'item_display', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['user__email', 'product__title']
+    search_fields = [
+        'user__email', 'product__title', 
+        'material_listing__material__name_en'
+    ]
     ordering = ['-created_at']
     
     def user_info(self, obj):
@@ -139,30 +254,67 @@ class FavoriteAdmin(admin.ModelAdmin):
             obj.user.email
         )
     user_info.short_description = 'User'
+    
+    def item_type_display(self, obj):
+        """Display favorite type"""
+        if obj.product:
+            return format_html('<span style="color: #28a745;">📦 Product</span>')
+        elif obj.material_listing:
+            return format_html('<span style="color: #fd7e14;">🧱 Material</span>')
+        return '-'
+    item_type_display.short_description = 'Type'
+    
+    def item_display(self, obj):
+        """Display the favorited item"""
+        if obj.product:
+            return format_html(
+                '<a href="/admin/marketplace/product/{}/change/">{}</a>',
+                obj.product.id,
+                obj.product.title
+            )
+        elif obj.material_listing:
+            return format_html(
+                '<a href="/admin/marketplace/materiallisting/{}/change/">{}</a>',
+                obj.material_listing.id,
+                obj.material_listing.material.name_en
+            )
+        return '-'
+    item_display.short_description = 'Item'
 
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     """Admin for Order model"""
     list_display = [
-        'order_number', 'buyer_info', 'seller_info', 'product',
-        'quantity', 'total_price', 'status', 'payment_status', 'created_at'
+        'order_number', 'buyer_info', 'seller_info', 'order_type_display',
+        'item_display', 'quantity', 'total_price', 'status', 
+        'payment_status', 'created_at'
     ]
     list_filter = [
-        'status', 'payment_status', 'created_at', 'confirmed_at', 'completed_at'
+        'order_type', 'status', 'payment_status', 'created_at', 
+        'confirmed_at', 'completed_at'
     ]
     search_fields = [
-        'order_number', 'buyer__email', 'seller__email', 'product__title'
+        'order_number', 'buyer__email', 'seller__email', 
+        'product__title', 'material_listing__material__name_en'
     ]
     ordering = ['-created_at']
     readonly_fields = [
-        'order_number', 'total_price', 'created_at', 
+        'order_number', 'order_type', 'total_price', 'created_at', 
         'updated_at', 'confirmed_at', 'completed_at'
     ]
     
     fieldsets = (
+        ('Order Type', {
+            'fields': ('order_type',),
+            'description': 'This field is automatically set based on whether a product or material is selected.'
+        }),
         ('Order Information', {
-            'fields': ('order_number', 'buyer', 'seller', 'product')
+            'fields': ('order_number', 'buyer', 'seller')
+        }),
+        ('Item Information', {
+            'fields': ('product', 'material_listing'),
+            'description': 'Select either a product OR a material listing (not both).'
         }),
         ('Order Details', {
             'fields': ('quantity', 'unit_price', 'total_price')
@@ -194,25 +346,65 @@ class OrderAdmin(admin.ModelAdmin):
             obj.seller.email
         )
     seller_info.short_description = 'Seller'
+    
+    def order_type_display(self, obj):
+        """Display order type with visual indicator"""
+        if obj.order_type == 'product':
+            return format_html(
+                '<span style="background-color: #28a745; color: white; padding: 3px 8px; '
+                'border-radius: 3px; font-weight: bold;">📦 PRODUCT</span>'
+            )
+        elif obj.order_type == 'material':
+            return format_html(
+                '<span style="background-color: #fd7e14; color: white; padding: 3px 8px; '
+                'border-radius: 3px; font-weight: bold;">🧱 MATERIAL</span>'
+            )
+        return '-'
+    order_type_display.short_description = 'Order Type'
+    
+    def item_display(self, obj):
+        """Display the item (product or material) with link"""
+        if obj.product:
+            return format_html(
+                '<a href="/admin/marketplace/product/{}/change/">{}</a>',
+                obj.product.id,
+                obj.product.title
+            )
+        elif obj.material_listing:
+            return format_html(
+                '<a href="/admin/marketplace/materiallisting/{}/change/">{} ({})</a>',
+                obj.material_listing.id,
+                obj.material_listing.material.name_en,
+                obj.material_listing.get_condition_display()
+            )
+        return '-'
+    item_display.short_description = 'Item'
 
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
     """Admin for Review model"""
     list_display = [
-        'product', 'reviewer_info', 'rating', 'is_verified_purchase',
-        'is_approved', 'created_at'
+        'item_type_display', 'item_display', 'reviewer_info', 'rating', 
+        'is_verified_purchase', 'is_approved', 'created_at'
     ]
     list_filter = [
         'rating', 'is_verified_purchase', 'is_approved', 'created_at'
     ]
-    search_fields = ['product__title', 'reviewer__email', 'title', 'comment']
+    search_fields = [
+        'product__title', 'material_listing__material__name_en',
+        'reviewer__email', 'title', 'comment'
+    ]
     ordering = ['-created_at']
     readonly_fields = ['is_verified_purchase', 'created_at', 'updated_at']
     
     fieldsets = (
+        ('Review Item', {
+            'fields': ('product', 'material_listing'),
+            'description': 'Select either a product OR a material listing (not both).'
+        }),
         ('Review Information', {
-            'fields': ('product', 'reviewer', 'order')
+            'fields': ('reviewer', 'order')
         }),
         ('Review Content', {
             'fields': ('rating', 'title', 'comment')
@@ -225,6 +417,32 @@ class ReviewAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def item_type_display(self, obj):
+        """Display review type"""
+        if obj.product:
+            return format_html('<span style="color: #28a745;">📦 Product</span>')
+        elif obj.material_listing:
+            return format_html('<span style="color: #fd7e14;">🧱 Material</span>')
+        return '-'
+    item_type_display.short_description = 'Type'
+    
+    def item_display(self, obj):
+        """Display the reviewed item"""
+        if obj.product:
+            return format_html(
+                '<a href="/admin/marketplace/product/{}/change/">{}</a>',
+                obj.product.id,
+                obj.product.title
+            )
+        elif obj.material_listing:
+            return format_html(
+                '<a href="/admin/marketplace/materiallisting/{}/change/">{}</a>',
+                obj.material_listing.id,
+                obj.material_listing.material.name_en
+            )
+        return '-'
+    item_display.short_description = 'Item'
     
     def reviewer_info(self, obj):
         return format_html(
@@ -251,20 +469,25 @@ class ReviewAdmin(admin.ModelAdmin):
 class MessageAdmin(admin.ModelAdmin):
     """Admin for Message model"""
     list_display = [
-        'sender_info', 'recipient_info', 'product', 
-        'subject', 'is_read', 'created_at'
+        'sender_info', 'recipient_info', 'item_type_display', 
+        'item_display', 'subject', 'is_read', 'created_at'
     ]
     list_filter = ['is_read', 'created_at']
     search_fields = [
         'sender__email', 'recipient__email', 
-        'subject', 'message', 'product__title'
+        'subject', 'message', 'product__title',
+        'material_listing__material__name_en'
     ]
     ordering = ['-created_at']
     readonly_fields = ['created_at', 'read_at']
     
     fieldsets = (
+        ('Related Item', {
+            'fields': ('product', 'material_listing'),
+            'description': 'Select either a product OR a material listing (not both).'
+        }),
         ('Message Information', {
-            'fields': ('sender', 'recipient', 'product')
+            'fields': ('sender', 'recipient')
         }),
         ('Content', {
             'fields': ('subject', 'message')
@@ -292,26 +515,57 @@ class MessageAdmin(admin.ModelAdmin):
             obj.recipient.email
         )
     recipient_info.short_description = 'Recipient'
+    
+    def item_type_display(self, obj):
+        """Display message item type"""
+        if obj.product:
+            return format_html('<span style="color: #28a745;">📦 Product</span>')
+        elif obj.material_listing:
+            return format_html('<span style="color: #fd7e14;">🧱 Material</span>')
+        return '-'
+    item_type_display.short_description = 'Type'
+    
+    def item_display(self, obj):
+        """Display the message item"""
+        if obj.product:
+            return format_html(
+                '<a href="/admin/marketplace/product/{}/change/">{}</a>',
+                obj.product.id,
+                obj.product.title
+            )
+        elif obj.material_listing:
+            return format_html(
+                '<a href="/admin/marketplace/materiallisting/{}/change/">{}</a>',
+                obj.material_listing.id,
+                obj.material_listing.material.name_en
+            )
+        return '-'
+    item_display.short_description = 'Item'
 
 
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
     """Admin for Report model"""
     list_display = [
-        'reporter_info', 'product', 'reason', 
+        'reporter_info', 'item_type_display', 'item_display', 'reason', 
         'status', 'created_at', 'resolved_at'
     ]
     list_filter = ['status', 'reason', 'created_at', 'resolved_at']
     search_fields = [
         'reporter__email', 'product__title', 
+        'material_listing__material__name_en',
         'description', 'admin_notes'
     ]
     ordering = ['-created_at']
     readonly_fields = ['created_at', 'updated_at', 'resolved_at']
     
     fieldsets = (
+        ('Reported Item', {
+            'fields': ('product', 'material_listing'),
+            'description': 'Select either a product OR a material listing (not both).'
+        }),
         ('Report Information', {
-            'fields': ('reporter', 'product')
+            'fields': ('reporter',)
         }),
         ('Report Details', {
             'fields': ('reason', 'description', 'status')
@@ -332,6 +586,32 @@ class ReportAdmin(admin.ModelAdmin):
             obj.reporter.email
         )
     reporter_info.short_description = 'Reporter'
+    
+    def item_type_display(self, obj):
+        """Display reported item type"""
+        if obj.product:
+            return format_html('<span style="color: #28a745;">📦 Product</span>')
+        elif obj.material_listing:
+            return format_html('<span style="color: #fd7e14;">🧱 Material</span>')
+        return '-'
+    item_type_display.short_description = 'Type'
+    
+    def item_display(self, obj):
+        """Display the reported item"""
+        if obj.product:
+            return format_html(
+                '<a href="/admin/marketplace/product/{}/change/">{}</a>',
+                obj.product.id,
+                obj.product.title
+            )
+        elif obj.material_listing:
+            return format_html(
+                '<a href="/admin/marketplace/materiallisting/{}/change/">{}</a>',
+                obj.material_listing.id,
+                obj.material_listing.material.name_en
+            )
+        return '-'
+    item_display.short_description = 'Item'
     
     actions = ['mark_reviewing', 'mark_resolved', 'mark_dismissed']
     

@@ -8,11 +8,15 @@ from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnl
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
-    Category, Product, ProductImage, Favorite,
+    Category, Material, MaterialListing, MaterialImage,
+    Product, ProductImage, Favorite,
     Order, Review, Message, Report
 )
 from .serializers import (
-    CategorySerializer, ProductListSerializer, ProductDetailSerializer,
+    CategorySerializer, MaterialSerializer,
+    MaterialListingListSerializer, MaterialListingDetailSerializer,
+    MaterialListingCreateUpdateSerializer, MaterialImageSerializer,
+    ProductListSerializer, ProductDetailSerializer,
     ProductCreateUpdateSerializer, ProductImageSerializer, FavoriteSerializer,
     OrderSerializer, ReviewSerializer, MessageSerializer, ReportSerializer
 )
@@ -55,6 +59,175 @@ class CategoryViewSet(viewsets.ModelViewSet):
         """Get category tree structure"""
         root_categories = self.queryset.filter(parent__isnull=True)
         serializer = self.get_serializer(root_categories, many=True)
+        return Response(serializer.data)
+
+
+class MaterialViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Material (Master Data) CRUD operations
+    - List all materials
+    - Retrieve single material
+    - Create/Update/Delete (admin only)
+    """
+    queryset = Material.objects.filter(is_active=True).select_related('category')
+    serializer_class = MaterialSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['category', 'is_active']
+    search_fields = ['name', 'name_ar', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    @action(detail=True, methods=['get'])
+    def listings(self, request, pk=None):
+        """Get all active listings for this material"""
+        material = self.get_object()
+        listings = MaterialListing.objects.filter(
+            material=material,
+            status='active'
+        ).select_related('seller', 'material')
+        
+        serializer = MaterialListingListSerializer(
+            listings,
+            many=True,
+            context={'request': request}
+        )
+        return Response(serializer.data)
+
+
+class MaterialListingViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Material Listing CRUD operations
+    - List all material listings (public)
+    - Retrieve single listing (public)
+    - Create listing (authenticated users)
+    - Update/Delete (owner only)
+    """
+    queryset = MaterialListing.objects.all().select_related(
+        'seller', 'material', 'material__category'
+    ).prefetch_related('images', 'reviews')
+    permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['material', 'condition', 'status', 'seller']
+    search_fields = ['title', 'title_ar', 'description', 'location', 'material__name']
+    ordering_fields = ['price_per_unit', 'quantity', 'created_at', 'views_count', 'favorites_count']
+    ordering = ['-created_at']
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return MaterialListingListSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return MaterialListingCreateUpdateSerializer
+        return MaterialListingDetailSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by status for non-owners
+        if self.action == 'list':
+            if not self.request.user.is_authenticated:
+                queryset = queryset.filter(status='active')
+            else:
+                # Show user's own listings regardless of status
+                queryset = queryset.filter(
+                    Q(status='active') | Q(seller=self.request.user)
+                )
+        
+        # Filter by price range
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        if min_price:
+            queryset = queryset.filter(price_per_unit__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(price_per_unit__lte=max_price)
+        
+        # Filter by quantity range
+        min_quantity = self.request.query_params.get('min_quantity')
+        max_quantity = self.request.query_params.get('max_quantity')
+        if min_quantity:
+            queryset = queryset.filter(quantity__gte=min_quantity)
+        if max_quantity:
+            queryset = queryset.filter(quantity__lte=max_quantity)
+        
+        return queryset
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Increment view count when retrieving a listing"""
+        instance = self.get_object()
+        instance.views_count += 1
+        instance.save(update_fields=['views_count'])
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def my_listings(self, request):
+        """Get current user's material listings"""
+        listings = self.queryset.filter(seller=request.user)
+        page = self.paginate_queryset(listings)
+        if page is not None:
+            serializer = MaterialListingListSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = MaterialListingListSerializer(listings, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def toggle_favorite(self, request, pk=None):
+        """Add or remove listing from user's favorites"""
+        listing = self.get_object()
+        favorite, created = Favorite.objects.get_or_create(
+            user=request.user,
+            material_listing=listing
+        )
+        
+        if not created:
+            # Already favorited, so remove it
+            favorite.delete()
+            listing.favorites_count = max(0, listing.favorites_count - 1)
+            listing.save(update_fields=['favorites_count'])
+            return Response(
+                {'detail': 'Removed from favorites'},
+                status=status.HTTP_200_OK
+            )
+        else:
+            # Newly favorited
+            listing.favorites_count += 1
+            listing.save(update_fields=['favorites_count'])
+            return Response(
+                {'detail': 'Added to favorites'},
+                status=status.HTTP_201_CREATED
+            )
+    
+    @action(detail=True, methods=['get'])
+    def reviews(self, request, pk=None):
+        """Get reviews for this listing"""
+        listing = self.get_object()
+        reviews = listing.reviews.filter(is_approved=True)
+        serializer = ReviewSerializer(reviews, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def publish(self, request, pk=None):
+        """Publish a draft listing"""
+        listing = self.get_object()
+        
+        # Only owner can publish
+        if listing.seller != request.user:
+            return Response(
+                {'detail': 'You do not have permission to publish this listing'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if listing.status != 'draft':
+            return Response(
+                {'detail': 'Only draft listings can be published'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        listing.status = 'active'
+        listing.published_at = timezone.now()
+        listing.save()
+        
+        serializer = self.get_serializer(listing)
         return Response(serializer.data)
 
 
