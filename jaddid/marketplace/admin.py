@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
     Category, Material, MaterialListing, MaterialImage,
-    Product, ProductImage, Favorite,
+    Product, ProductImage, Cart, CartItem, Favorite,
     Order, Review, Message, Report
 )
 
@@ -234,6 +234,153 @@ class ProductImageAdmin(admin.ModelAdmin):
             )
         return '-'
     image_preview.short_description = 'Preview'
+
+
+class CartItemInline(admin.TabularInline):
+    """Inline admin for cart items"""
+    model = CartItem
+    extra = 0
+    fields = ['item_display', 'quantity', 'unit_price_display', 'subtotal_display']
+    readonly_fields = ['item_display', 'unit_price_display', 'subtotal_display']
+    can_delete = True
+    
+    def item_display(self, obj):
+        """Display the cart item"""
+        if obj.product:
+            return format_html(
+                '📦 <a href="/admin/marketplace/product/{}/change/">{}</a>',
+                obj.product.id,
+                obj.product.title
+            )
+        elif obj.material_listing:
+            return format_html(
+                '🧱 <a href="/admin/marketplace/materiallisting/{}/change/">{}</a>',
+                obj.material_listing.id,
+                obj.material_listing.material.name
+            )
+        return '-'
+    item_display.short_description = 'Item'
+    
+    def unit_price_display(self, obj):
+        return f'{obj.unit_price:.2f}'
+    unit_price_display.short_description = 'Unit Price'
+    
+    def subtotal_display(self, obj):
+        return f'{obj.subtotal:.2f}'
+    subtotal_display.short_description = 'Subtotal'
+
+
+@admin.register(Cart)
+class CartAdmin(admin.ModelAdmin):
+    """Admin for Cart model"""
+    list_display = ['user_info', 'total_items_display', 'total_price_display', 'updated_at', 'created_at']
+    list_filter = ['created_at', 'updated_at']
+    search_fields = ['user__email', 'user__first_name', 'user__last_name']
+    ordering = ['-updated_at']
+    readonly_fields = ['created_at', 'updated_at']
+    inlines = [CartItemInline]
+    
+    fieldsets = (
+        ('Cart Information', {
+            'fields': ('user',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def user_info(self, obj):
+        return format_html(
+            '<a href="/admin/accounts/user/{}/change/">{}</a>',
+            obj.user.id,
+            obj.user.email
+        )
+    user_info.short_description = 'User'
+    
+    def total_items_display(self, obj):
+        return obj.total_items
+    total_items_display.short_description = 'Total Items'
+    
+    def total_price_display(self, obj):
+        return f'{obj.total_price:.2f}'
+    total_price_display.short_description = 'Total Price'
+
+
+@admin.register(CartItem)
+class CartItemAdmin(admin.ModelAdmin):
+    """Admin for CartItem model"""
+    list_display = ['cart_user', 'item_type_display', 'item_display', 'quantity', 'unit_price_display', 'subtotal_display', 'created_at']
+    list_filter = ['created_at', 'updated_at']
+    search_fields = [
+        'cart__user__email', 'product__title',
+        'material_listing__material__name'
+    ]
+    ordering = ['-created_at']
+    readonly_fields = ['unit_price_display', 'subtotal_display', 'created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Cart', {
+            'fields': ('cart',)
+        }),
+        ('Item', {
+            'fields': ('product', 'material_listing'),
+            'description': 'Select either a product OR a material listing (not both).'
+        }),
+        ('Quantity', {
+            'fields': ('quantity',)
+        }),
+        ('Pricing', {
+            'fields': ('unit_price_display', 'subtotal_display'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def cart_user(self, obj):
+        return format_html(
+            '<a href="/admin/accounts/user/{}/change/">{}</a>',
+            obj.cart.user.id,
+            obj.cart.user.email
+        )
+    cart_user.short_description = 'User'
+    
+    def item_type_display(self, obj):
+        """Display item type"""
+        if obj.product:
+            return format_html('<span style="color: #28a745;">📦 Product</span>')
+        elif obj.material_listing:
+            return format_html('<span style="color: #fd7e14;">🧱 Material</span>')
+        return '-'
+    item_type_display.short_description = 'Type'
+    
+    def item_display(self, obj):
+        """Display the cart item"""
+        if obj.product:
+            return format_html(
+                '<a href="/admin/marketplace/product/{}/change/">{}</a>',
+                obj.product.id,
+                obj.product.title
+            )
+        elif obj.material_listing:
+            return format_html(
+                '<a href="/admin/marketplace/materiallisting/{}/change/">{}</a>',
+                obj.material_listing.id,
+                obj.material_listing.material.name
+            )
+        return '-'
+    item_display.short_description = 'Item'
+    
+    def unit_price_display(self, obj):
+        return f'{obj.unit_price:.2f}'
+    unit_price_display.short_description = 'Unit Price'
+    
+    def subtotal_display(self, obj):
+        return f'{obj.subtotal:.2f}'
+    subtotal_display.short_description = 'Subtotal'
 
 
 @admin.register(Favorite)

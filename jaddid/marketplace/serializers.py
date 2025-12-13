@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import (
     Category, Material, MaterialListing, MaterialImage,
-    Product, ProductImage, Favorite,
+    Product, ProductImage, Cart, CartItem, Favorite,
     Order, Review, Message, Report
 )
 from accounts.models import User
@@ -428,6 +428,111 @@ class FavoriteSerializer(serializers.ModelSerializer):
             validated_data['material_listing'] = MaterialListing.objects.get(id=material_listing_id)
         
         return super().create(validated_data)
+
+
+class CartItemSerializer(serializers.ModelSerializer):
+    """Cart Item Serializer - Supports both Products and Material Listings"""
+    
+    product_id = serializers.UUIDField(write_only=True, required=False)
+    material_listing_id = serializers.UUIDField(write_only=True, required=False)
+    product = ProductListSerializer(read_only=True)
+    material_listing = MaterialListingListSerializer(read_only=True)
+    unit_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    item_type = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CartItem
+        fields = [
+            'id', 'cart', 'product', 'product_id', 'material_listing', 
+            'material_listing_id', 'quantity', 'unit_price', 'subtotal',
+            'item_type', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'cart', 'created_at', 'updated_at']
+    
+    def get_item_type(self, obj):
+        """Return the type of item (product or material)"""
+        if obj.product:
+            return 'product'
+        elif obj.material_listing:
+            return 'material'
+        return None
+    
+    def validate(self, data):
+        """Validate that either product or material is provided, not both"""
+        product_id = data.get('product_id')
+        material_listing_id = data.get('material_listing_id')
+        
+        if not product_id and not material_listing_id:
+            raise serializers.ValidationError(
+                "Either product_id or material_listing_id must be provided"
+            )
+        
+        if product_id and material_listing_id:
+            raise serializers.ValidationError(
+                "Cannot add both product and material to cart at the same time"
+            )
+        
+        # Validate product availability
+        if product_id:
+            try:
+                product = Product.objects.get(id=product_id)
+                if product.status != 'active':
+                    raise serializers.ValidationError(
+                        f"Product is not available (status: {product.status})"
+                    )
+                if product.quantity < data.get('quantity', 1):
+                    raise serializers.ValidationError(
+                        f"Only {product.quantity} units available"
+                    )
+            except Product.DoesNotExist:
+                raise serializers.ValidationError("Product not found")
+        
+        # Validate material listing availability
+        if material_listing_id:
+            try:
+                material = MaterialListing.objects.get(id=material_listing_id)
+                if material.status != 'active':
+                    raise serializers.ValidationError(
+                        f"Material listing is not available (status: {material.status})"
+                    )
+                if material.quantity < data.get('quantity', 1):
+                    raise serializers.ValidationError(
+                        f"Only {material.quantity} units available"
+                    )
+            except MaterialListing.DoesNotExist:
+                raise serializers.ValidationError("Material listing not found")
+        
+        return data
+    
+    def create(self, validated_data):
+        """Create cart item and link to product or material"""
+        product_id = validated_data.pop('product_id', None)
+        material_listing_id = validated_data.pop('material_listing_id', None)
+        
+        if product_id:
+            validated_data['product'] = Product.objects.get(id=product_id)
+        if material_listing_id:
+            validated_data['material_listing'] = MaterialListing.objects.get(id=material_listing_id)
+        
+        return super().create(validated_data)
+
+
+class CartSerializer(serializers.ModelSerializer):
+    """Cart Serializer"""
+    
+    items = CartItemSerializer(many=True, read_only=True)
+    total_items = serializers.IntegerField(read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = Cart
+        fields = [
+            'id', 'user', 'user_email', 'items', 'total_items',
+            'total_price', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
 
 
 class OrderSerializer(serializers.ModelSerializer):

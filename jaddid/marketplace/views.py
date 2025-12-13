@@ -9,7 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
     Category, Material, MaterialListing, MaterialImage,
-    Product, ProductImage, Favorite,
+    Product, ProductImage, Cart, CartItem, Favorite,
     Order, Review, Message, Report
 )
 from .serializers import (
@@ -17,7 +17,8 @@ from .serializers import (
     MaterialListingListSerializer, MaterialListingDetailSerializer,
     MaterialListingCreateUpdateSerializer, MaterialImageSerializer,
     ProductListSerializer, ProductDetailSerializer,
-    ProductCreateUpdateSerializer, ProductImageSerializer, FavoriteSerializer,
+    ProductCreateUpdateSerializer, ProductImageSerializer,
+    CartSerializer, CartItemSerializer, FavoriteSerializer,
     OrderSerializer, ReviewSerializer, MessageSerializer, ReportSerializer
 )
 from .permissions import IsSellerOrReadOnly, IsOwnerOrReadOnly
@@ -358,6 +359,167 @@ class ProductViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(product)
         return Response(serializer.data)
+
+
+class CartViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Shopping Cart operations
+    - Get cart (create if doesn't exist)
+    - Add items to cart
+    - Update item quantity
+    - Remove items from cart
+    - Clear cart
+    """
+    serializer_class = CartSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Get or create user's cart"""
+        cart, created = Cart.objects.get_or_create(user=self.request.user)
+        return Cart.objects.filter(user=self.request.user).prefetch_related(
+            'items__product',
+            'items__material_listing',
+            'items__product__seller',
+            'items__material_listing__seller'
+        )
+    
+    def list(self, request, *args, **kwargs):
+        """Get current user's cart"""
+        cart, created = Cart.objects.get_or_create(user=request.user)
+        serializer = self.get_serializer(cart)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def add_item(self, request):
+        """Add item to cart"""
+        cart, created = Cart.objects.get_or_create(user=request.user)
+        
+        data = request.data.copy()
+        data['cart'] = cart.id
+        
+        # Check if item already exists in cart
+        product_id = data.get('product_id')
+        material_listing_id = data.get('material_listing_id')
+        
+        existing_item = None
+        if product_id:
+            existing_item = CartItem.objects.filter(cart=cart, product_id=product_id).first()
+        elif material_listing_id:
+            existing_item = CartItem.objects.filter(cart=cart, material_listing_id=material_listing_id).first()
+        
+        if existing_item:
+            # Update quantity
+            quantity = data.get('quantity', 1)
+            existing_item.quantity += float(quantity)
+            existing_item.save()
+            
+            serializer = CartItemSerializer(existing_item, context={'request': request})
+            return Response(
+                {
+                    'detail': 'Item quantity updated',
+                    'item': serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        # Create new cart item
+        serializer = CartItemSerializer(data=data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save(cart=cart)
+        
+        # Return updated cart
+        cart_serializer = CartSerializer(cart, context={'request': request})
+        return Response(
+            {
+                'detail': 'Item added to cart',
+                'cart': cart_serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def update_item(self, request):
+        """Update cart item quantity"""
+        cart = Cart.objects.get(user=request.user)
+        item_id = request.data.get('item_id')
+        quantity = request.data.get('quantity')
+        
+        if not item_id:
+            return Response(
+                {'error': 'item_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not quantity or float(quantity) <= 0:
+            return Response(
+                {'error': 'Valid quantity is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            cart_item = CartItem.objects.get(id=item_id, cart=cart)
+            cart_item.quantity = float(quantity)
+            cart_item.save()
+            
+            serializer = CartItemSerializer(cart_item, context={'request': request})
+            return Response(
+                {
+                    'detail': 'Item quantity updated',
+                    'item': serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        except CartItem.DoesNotExist:
+            return Response(
+                {'error': 'Cart item not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def remove_item(self, request):
+        """Remove item from cart"""
+        cart = Cart.objects.get(user=request.user)
+        item_id = request.data.get('item_id')
+        
+        if not item_id:
+            return Response(
+                {'error': 'item_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            cart_item = CartItem.objects.get(id=item_id, cart=cart)
+            cart_item.delete()
+            
+            # Return updated cart
+            cart_serializer = CartSerializer(cart, context={'request': request})
+            return Response(
+                {
+                    'detail': 'Item removed from cart',
+                    'cart': cart_serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        except CartItem.DoesNotExist:
+            return Response(
+                {'error': 'Cart item not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def clear(self, request):
+        """Clear all items from cart"""
+        cart = Cart.objects.get(user=request.user)
+        cart.items.all().delete()
+        
+        cart_serializer = CartSerializer(cart, context={'request': request})
+        return Response(
+            {
+                'detail': 'Cart cleared',
+                'cart': cart_serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 class FavoriteViewSet(viewsets.ModelViewSet):

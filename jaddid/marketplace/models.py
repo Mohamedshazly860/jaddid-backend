@@ -423,6 +423,145 @@ class ProductImage(models.Model):
         return f"Image for {self.product.title}"
 
 
+class Cart(models.Model):
+    """Shopping Cart Model"""
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='cart',
+        verbose_name=_("User")
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Cart")
+        verbose_name_plural = _("Carts")
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Cart for {self.user.email}"
+    
+    @property
+    def total_items(self):
+        """Get total number of items in cart"""
+        return self.items.count()
+    
+    @property
+    def total_price(self):
+        """Calculate total price of all items in cart"""
+        total = sum(item.subtotal for item in self.items.all())
+        return total
+
+
+class CartItem(models.Model):
+    """Cart Item Model - Supports both Products and Material Listings"""
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cart = models.ForeignKey(
+        Cart,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name=_("Cart")
+    )
+    # Support for Products
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='cart_items',
+        verbose_name=_("Product"),
+        null=True,
+        blank=True
+    )
+    # Support for Material Listings
+    material_listing = models.ForeignKey(
+        MaterialListing,
+        on_delete=models.CASCADE,
+        related_name='cart_items',
+        verbose_name=_("Material Listing"),
+        null=True,
+        blank=True
+    )
+    quantity = models.DecimalField(
+        _("Quantity"),
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        default=1
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Cart Item")
+        verbose_name_plural = _("Cart Items")
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['cart', '-created_at']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(product__isnull=False, material_listing__isnull=True) |
+                    models.Q(product__isnull=True, material_listing__isnull=False)
+                ),
+                name='cartitem_either_product_or_material'
+            ),
+            models.UniqueConstraint(
+                fields=['cart', 'product'],
+                condition=models.Q(product__isnull=False),
+                name='unique_cart_product'
+            ),
+            models.UniqueConstraint(
+                fields=['cart', 'material_listing'],
+                condition=models.Q(material_listing__isnull=False),
+                name='unique_cart_material'
+            ),
+        ]
+
+    def __str__(self):
+        if self.product:
+            return f"{self.quantity} x {self.product.title}"
+        elif self.material_listing:
+            return f"{self.quantity} x {self.material_listing.material.name}"
+        return f"Cart Item {self.id}"
+    
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        # Ensure exactly one of product or material_listing is set
+        if not self.product and not self.material_listing:
+            raise ValidationError(_("Either product or material_listing must be set"))
+        if self.product and self.material_listing:
+            raise ValidationError(_("Cannot add both product and material_listing to cart"))
+        
+        # Validate quantity against available stock
+        if self.product and self.quantity > self.product.quantity:
+            raise ValidationError(_(f"Only {self.product.quantity} units available"))
+        if self.material_listing and self.quantity > self.material_listing.quantity:
+            raise ValidationError(_(f"Only {self.material_listing.quantity} units available"))
+    
+    @property
+    def unit_price(self):
+        """Get the unit price of the item"""
+        if self.product:
+            return self.product.price
+        elif self.material_listing:
+            return self.material_listing.price_per_unit
+        return 0
+    
+    @property
+    def subtotal(self):
+        """Calculate subtotal for this cart item"""
+        return float(self.quantity) * float(self.unit_price)
+    
+    @property
+    def item(self):
+        """Get the item (product or material)"""
+        return self.product if self.product else self.material_listing
+
+
 class Favorite(models.Model):
     """User Favorites/Wishlist Model - Supports both Products and Material Listings"""
     
