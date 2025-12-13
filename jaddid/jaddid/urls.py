@@ -38,6 +38,9 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    #Accounts URLs
+    path('api/accounts/', include('accounts.urls')),
     
     # API endpoints
     path('api/marketplace/', include('marketplace.urls')),
