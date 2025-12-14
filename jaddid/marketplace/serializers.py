@@ -651,6 +651,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             'id', 'reviewer', 'is_verified_purchase',
             'is_approved', 'created_at', 'updated_at'
         ]
+        ref_name = "MarketplaceReview"
     
     def get_material_title(self, obj):
         if obj.material_listing:

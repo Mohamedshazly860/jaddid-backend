@@ -25,12 +25,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@!g0$h)g48c@)x$fl=@zx)#_ys7vg+ry(g1(eq-#s_3hujbs+f'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 
@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'modeltranslation',
     'accounts',
     'marketplace',
+    'apps.community',
 ]
 
 MIDDLEWARE = [
@@ -185,3 +186,18 @@ REST_FRAMEWORK = {
 }
 
 AUTH_USER_MODEL = 'accounts.User'
+
+# Swagger settings for JWT authentication
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
+        }
+    },
+    'SECURITY_REQUIREMENTS': [{'Bearer': []}],
+    'USE_SESSION_AUTH': False,
+    'JSON_EDITOR': True,
+}

@@ -174,7 +174,7 @@ class ProductAdmin(admin.ModelAdmin):
             )
         }),
         ('Pricing & Quantity', {
-            'fields': ('price', 'quantity', 'unit')
+            'fields': ('price', 'quantity')
         }),
         ('Details', {
             'fields': ('condition', 'status')
