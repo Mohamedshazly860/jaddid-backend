@@ -122,6 +122,8 @@ class MaterialListingViewSet(viewsets.ModelViewSet):
         return MaterialListingDetailSerializer
     
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return self.queryset.none()
         queryset = super().get_queryset()
         
         # Filter by status for non-owners
@@ -258,6 +260,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ProductDetailSerializer
     
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return self.queryset.none()
         queryset = super().get_queryset()
         
         # Filter by status for non-owners
@@ -530,6 +534,8 @@ class FavoriteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Favorite.objects.none()
         return Favorite.objects.filter(
             user=self.request.user
         ).select_related('product', 'product__seller', 'product__category')
@@ -582,6 +588,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Order.objects.none()
         """Users can only see their own orders (as buyer or seller)"""
         return Order.objects.filter(
             Q(buyer=self.request.user) | Q(seller=self.request.user)
@@ -734,6 +742,8 @@ class MessageViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Message.objects.none()
         """Get messages sent to or by the current user"""
         return Message.objects.filter(
             Q(sender=self.request.user) | Q(recipient=self.request.user)
@@ -802,6 +812,8 @@ class ReportViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Report.objects.none()
         queryset = Report.objects.all().select_related(
             'reporter', 'product', 'resolved_by'
         )
