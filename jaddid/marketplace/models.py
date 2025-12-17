@@ -240,7 +240,6 @@ class MaterialListing(models.Model):
         return self.quantity * self.price
 
 
-
 class MaterialImage(models.Model):
     """Material Listing Images Model"""
     
