@@ -21,6 +21,7 @@ from django.conf.urls.static import static
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 # Swagger/OpenAPI Schema
 
@@ -45,11 +46,19 @@ urlpatterns = [
     #Accounts URLs
     path('api/accounts/', include('accounts.urls')),
     
+    # JWT Authentication
+    path('api/auth/jwt/create/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/jwt/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
     # API endpoints
     path('api/marketplace/', include('marketplace.urls')),
+HEAD
 
     #Logistics URLs
     path('api/logistics/', include('logistics.urls')),
+
+    path('api/community/', include('apps.community.urls')),
+    17ec7315c787cd16a7a0a6a36b78f0b547544258
     
     #Orders urls
     path('api/orders/', include('orders.urls')),

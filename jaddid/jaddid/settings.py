@@ -26,12 +26,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@!g0$h)g48c@)x$fl=@zx)#_ys7vg+ry(g1(eq-#s_3hujbs+f'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 
@@ -52,9 +52,14 @@ INSTALLED_APPS = [
     'modeltranslation',
     'accounts',
     'marketplace',
+<<<<<<< HEAD
     'orders',
     'logistics'
     ]
+=======
+    'apps.community',
+]
+>>>>>>> 17ec7315c787cd16a7a0a6a36b78f0b547544258
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -186,6 +191,7 @@ REST_FRAMEWORK = {
     ),
 }
 
+<<<<<<< HEAD
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -197,3 +203,21 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend', # Default for Admin/Users
     'logistics.backends.CourierBackend',         # For your Couriers
 ]
+=======
+AUTH_USER_MODEL = 'accounts.User'
+
+# Swagger settings for JWT authentication
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
+        }
+    },
+    'SECURITY_REQUIREMENTS': [{'Bearer': []}],
+    'USE_SESSION_AUTH': False,
+    'JSON_EDITOR': True,
+}
+>>>>>>> 17ec7315c787cd16a7a0a6a36b78f0b547544258
