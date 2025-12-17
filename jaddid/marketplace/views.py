@@ -21,7 +21,7 @@ from .serializers import (
     CartSerializer, CartItemSerializer, FavoriteSerializer,
     OrderSerializer, ReviewSerializer, MessageSerializer, ReportSerializer
 )
-from .permissions import IsSellerOrReadOnly, IsOwnerOrReadOnly
+from .permissions import IsOwnerOrReadOnly
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -107,7 +107,7 @@ class MaterialListingViewSet(viewsets.ModelViewSet):
     queryset = MaterialListing.objects.all().select_related(
         'seller', 'material', 'material__category'
     ).prefetch_related('images', 'reviews')
-    permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['material', 'condition', 'status', 'seller']
     search_fields = ['title', 'title_ar', 'description', 'location', 'material__name']
@@ -245,7 +245,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().select_related(
         'seller', 'category'
     ).prefetch_related('images', 'reviews')
-    permission_classes = [IsAuthenticatedOrReadOnly, IsSellerOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'condition', 'status', 'seller']
     search_fields = ['title', 'title_ar', 'description', 'location']
@@ -293,7 +293,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
-    
+
+
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_products(self, request):
         """Get current user's products"""

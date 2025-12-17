@@ -1,43 +1,33 @@
 from rest_framework import permissions
 
 
-class IsSellerOrReadOnly(permissions.BasePermission):
-    """
-    Custom permission to only allow sellers of a product to edit it.
-    """
-    
-    def has_object_permission(self, request, view, obj):
-        # Read permissions are allowed to any request
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        
-        # Write permissions are only allowed to the seller of the product
-        return obj.seller == request.user
-
-
 class IsOwnerOrReadOnly(permissions.BasePermission):
+    """Generic owner-or-read-only permission.
+
+    - Safe methods (GET/HEAD/OPTIONS) are allowed for anyone.
+    - For write methods, the request user must be the owner. The owner
+      attribute may be named `seller`, `user`, `owner` or `creator` on
+      the target object; we check these in order.
     """
-    Custom permission to only allow owners of an object to edit it.
-    """
-    
+
     def has_object_permission(self, request, view, obj):
-        # Read permissions are allowed to any request
         if request.method in permissions.SAFE_METHODS:
             return True
-        
-        # Write permissions are only allowed to the owner
-        return obj.user == request.user
+
+        # Try several common owner attribute names
+        for attr in ('seller', 'user', 'owner', 'creator'):
+            owner = getattr(obj, attr, None)
+            if owner is not None:
+                return owner == request.user
+
+        # If no owner attr found, deny write access by default
+        return False
 
 
 class IsAdminOrReadOnly(permissions.BasePermission):
-    """
-    Custom permission to only allow admin users to edit.
-    """
-    
+    """Admin-only write access, read allowed for everyone."""
+
     def has_permission(self, request, view):
-        # Read permissions are allowed to any request
         if request.method in permissions.SAFE_METHODS:
             return True
-        
-        # Write permissions are only allowed to admin users
         return request.user and request.user.is_staff

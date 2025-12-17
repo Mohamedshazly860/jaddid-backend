@@ -2,6 +2,7 @@ from functools import partial
 import stat
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes,parser_classes
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -25,6 +26,7 @@ from .serializers import (
 from accounts import serializers
 
 # Create your views here.
+# @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
@@ -45,6 +47,7 @@ def register_user(request):
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
@@ -104,6 +107,7 @@ def logout_user(request):
         }, status=status.HTTP_400_BAD_REQUEST)
     
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def refresh_token(request):
@@ -344,4 +348,13 @@ def get_role_choices(request):
     return Response({
         'roles': choices
     }, status=status.HTTP_200_OK)
+
+
+# Temporary debug endpoint to verify CSRF behavior
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def debug_no_csrf(request):
+    """Return OK to test whether CSRF is blocking POSTs."""
+    return Response({'ok': True, 'method': request.method}, status=status.HTTP_200_OK)
 

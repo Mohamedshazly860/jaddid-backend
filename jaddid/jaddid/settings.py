@@ -52,14 +52,10 @@ INSTALLED_APPS = [
     'modeltranslation',
     'accounts',
     'marketplace',
-<<<<<<< HEAD
     'orders',
-    'logistics'
-    ]
-=======
+    'logistics',
     'apps.community',
 ]
->>>>>>> 17ec7315c787cd16a7a0a6a36b78f0b547544258
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -176,11 +172,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 # REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'logistics.authentication.CourierJWTAuthentication',
-    ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -191,7 +184,6 @@ REST_FRAMEWORK = {
     ),
 }
 
-<<<<<<< HEAD
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -203,7 +195,7 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend', # Default for Admin/Users
     'logistics.backends.CourierBackend',         # For your Couriers
 ]
-=======
+
 AUTH_USER_MODEL = 'accounts.User'
 
 # Swagger settings for JWT authentication
@@ -220,4 +212,3 @@ SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': False,
     'JSON_EDITOR': True,
 }
->>>>>>> 17ec7315c787cd16a7a0a6a36b78f0b547544258
