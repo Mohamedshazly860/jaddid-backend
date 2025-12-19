@@ -15,6 +15,8 @@ class ProfileSerializer(serializers.ModelSerializer):
             'address',
             'bio',
             'profile_image',
+            'average_rating',
+            'review_count',
             'created_at',
             'updated_at'
         ]

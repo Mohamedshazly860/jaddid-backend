@@ -56,7 +56,7 @@ urlpatterns = [
     #Logistics URLs
     path('api/logistics/', include('logistics.urls')),
 
-    path('api/community/', include('apps.community.urls')),
+    path('api/community/', include('community.urls')),
     
     #Orders urls
     path('api/orders/', include('orders.urls')),
@@ -69,5 +69,5 @@ urlpatterns = [
 
 # Media files handling in development
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

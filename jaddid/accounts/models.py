@@ -92,6 +92,8 @@ class Profile(models.Model):
         null=True,
         blank=True
         )
+    average_rating=models.FloatField(default=0.0)
+    review_count=models.PositiveBigIntegerField(default=0)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)
 

@@ -31,7 +31,6 @@ urlpatterns = [
     
     # Utilities
     path('roles/', views.get_role_choices, name='role-choices'),
-    path('debug/no-csrf/', views.debug_no_csrf, name='debug-no-csrf'),
     # path('verify-phone/', views.verify_phone, name='verify-phone'),
     # path('resend-verification/', views.resend_verification_code, name='resend-verification'),
 ]
