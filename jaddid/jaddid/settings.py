@@ -165,7 +165,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS Settings (for React frontend)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React dev server
-    "http://localhost:5173",  # Vite dev server
+    "http://localhost:5178",  # Vite dev server
 ]
 
 CORS_ALLOW_CREDENTIALS = True
