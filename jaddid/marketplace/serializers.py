@@ -58,10 +58,20 @@ class MaterialSerializer(serializers.ModelSerializer):
 class MaterialImageSerializer(serializers.ModelSerializer):
     """Material Listing Image Serializer"""
     
+    image = serializers.SerializerMethodField()
+    
     class Meta:
         model = MaterialImage
         fields = ['id', 'image', 'is_primary', 'order', 'created_at']
         read_only_fields = ['id', 'created_at']
+    
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class MaterialListingListSerializer(serializers.ModelSerializer):
@@ -225,10 +235,20 @@ class MaterialListingCreateUpdateSerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     """Product Image Serializer"""
     
+    image = serializers.SerializerMethodField()
+    
     class Meta:
         model = ProductImage
         fields = ['id', 'image', 'is_primary', 'order', 'created_at']
         read_only_fields = ['id', 'created_at']
+    
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class ProductListSerializer(serializers.ModelSerializer):
