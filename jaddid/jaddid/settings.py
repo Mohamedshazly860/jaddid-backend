@@ -29,7 +29,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
+<<<<<<< HEAD
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
+=======
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+>>>>>>> 1bcdf1ad1ad3871d8cc3f2dc50b9540f537908c8
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
@@ -165,16 +169,37 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS Settings (for React frontend)
+# CORS Settings (for React/Vite frontend)
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React dev server
-    "http://localhost:5173",  # Vite dev server
+    "http://localhost:5174",   # Vite dev server (current)
+    "http://127.0.0.1:5174",   # Vite dev server (IP)
+    "http://localhost:3000",   # React dev server
+    "http://localhost:5173",   # Vite dev server
+    "http://localhost:5178",   # Alternative Vite port
+    "http://127.0.0.1:5173",   # Vite dev server (IP)
+    "http://127.0.0.1:5178",   # Alternative Vite port (IP)
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 # REST Framework
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'jaddid.authentication.CustomJWTAuthentication',  # Custom JWT that allows anonymous access
+        'rest_framework.authentication.SessionAuthentication',
+    ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',
     ),
@@ -190,6 +215,12 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'UPDATE_LAST_LOGIN': False,
 }
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -215,3 +246,5 @@ SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': False,
     'JSON_EDITOR': True,
 }
+
+

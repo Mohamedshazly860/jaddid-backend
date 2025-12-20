@@ -346,7 +346,7 @@ class Product(models.Model):
         _("Status"),
         max_length=20,
         choices=STATUS_CHOICES,
-        default=DRAFT
+        default=ACTIVE
     )
     
     # Location

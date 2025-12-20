@@ -395,6 +395,39 @@ class CartViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(cart)
         return Response(serializer.data)
     
+    def create(self, request, *args, **kwargs):
+        """Handle POST to /cart/ - redirect to add_item logic"""
+        try:
+            return self.add_item(request)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def destroy(self, request, *args, **kwargs):
+        """Handle DELETE to /cart/<item_id>/ - remove cart item"""
+        item_id = kwargs.get('pk')
+        cart = Cart.objects.get(user=request.user)
+        
+        try:
+            cart_item = CartItem.objects.get(id=item_id, cart=cart)
+            cart_item.delete()
+            
+            cart_serializer = CartSerializer(cart, context={'request': request})
+            return Response(
+                {
+                    'detail': 'Item removed from cart',
+                    'cart': cart_serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        except CartItem.DoesNotExist:
+            return Response(
+                {'error': 'Cart item not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def add_item(self, request):
         """Add item to cart"""
@@ -414,16 +447,12 @@ class CartViewSet(viewsets.ModelViewSet):
             existing_item = CartItem.objects.filter(cart=cart, material_listing_id=material_listing_id).first()
         
         if existing_item:
-            # Update quantity
-            quantity = data.get('quantity', 1)
-            existing_item.quantity += float(quantity)
-            existing_item.save()
-            
-            serializer = CartItemSerializer(existing_item, context={'request': request})
+            # Item already in cart - return message
             return Response(
                 {
-                    'detail': 'Item quantity updated',
-                    'item': serializer.data
+                    'detail': 'This item is already in your cart',
+                    'already_in_cart': True,
+                    'item_id': str(existing_item.id)
                 },
                 status=status.HTTP_200_OK
             )
@@ -447,12 +476,13 @@ class CartViewSet(viewsets.ModelViewSet):
     def update_item(self, request):
         """Update cart item quantity"""
         cart = Cart.objects.get(user=request.user)
-        item_id = request.data.get('item_id')
+        # Accept both 'item_id' and 'cart_item_id' from frontend
+        item_id = request.data.get('item_id') or request.data.get('cart_item_id')
         quantity = request.data.get('quantity')
         
         if not item_id:
             return Response(
-                {'error': 'item_id is required'},
+                {'error': 'item_id or cart_item_id is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -512,7 +542,7 @@ class CartViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
     
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def clear(self, request):
         """Clear all items from cart"""
         cart = Cart.objects.get(user=request.user)
@@ -534,6 +564,7 @@ class FavoriteViewSet(viewsets.ModelViewSet):
     """
     serializer_class = FavoriteSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # Disable pagination for favorites
     
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
