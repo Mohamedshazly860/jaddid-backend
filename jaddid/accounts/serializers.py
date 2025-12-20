@@ -20,7 +20,11 @@ class ProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields=['id', 'created_at', 'updated_at']
+        read_only_fields=['id', 'created_at', 'updated_at', 'review_count', 'average_rating']
+
+        extra_kwargs = {
+            'profile_image': {'read_only': True}
+        }
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializers for GET requests only"""

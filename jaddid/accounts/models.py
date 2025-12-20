@@ -98,7 +98,7 @@ class Profile(models.Model):
     updated_at=models.DateTimeField(auto_now=True)
 
 
-    class meta:
+    class Meta:
         verbose_name=_("profile")
         verbose_name_plural=_("profiles")
 

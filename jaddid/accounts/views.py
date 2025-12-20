@@ -1,5 +1,6 @@
 from functools import partial
 import stat
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes,parser_classes
 from django.views.decorators.csrf import csrf_exempt
@@ -136,8 +137,15 @@ def refresh_token(request):
 def get_current_user(request):
     """get current user details"""
     user = request.user
-    serializer=UserSerializer(user)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    # Serialize user and profile together
+    user_data = UserSerializer(user).data
+    profile = getattr(user, 'profile', None)
+    profile_data = ProfileSerializer(profile).data if profile is not None else None
+
+    return Response({
+        'user': user_data,
+        'profile': profile_data
+    }, status=status.HTTP_200_OK)
 
 
 
@@ -228,10 +236,11 @@ def list_users(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+
 def get_user_by_id(request, user_id):
     """get user by id (public profile)"""
     try:
-        user = User.objects.filter(id=user_id, is_active=True)
+        user = get_object_or_404(User, id=user_id)
         serializer=UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
@@ -278,6 +287,7 @@ def update_profile(request):
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
 def upload_profile_image(request):
     """upload profile Image"""
     profile = request.user.profile
@@ -286,10 +296,14 @@ def upload_profile_image(request):
     if serializer.is_valid():
         serializer.save()
 
+        image_url = None
+        if profile.profile_image:
+            image_url = request.build_absolute_uri(profile.profile_image.url)
         return Response({
-            'profile_image': request.build_absolute_uri(serializer.data.get('profile_image')),
+            'profile_image': image_url,
             'message': 'Profile Image has been uploaded'
         }, status=status.HTTP_200_OK)
+    
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
