@@ -1,3 +1,5 @@
+from math import perm
+import stat
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -5,7 +7,9 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
-from django.db.models import F
+from django.db.models import F, Q
+from yaml import serialize
+from decimal import Decimal
 
 from .models import Order, OrderItem, OrderStatusTracking
 from .serializers import OrderSerializer
@@ -17,18 +21,26 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        """Return orders where user is buyer OR seller"""
+
         user = self.request.user
         if user.is_staff:
             return Order.objects.all()
-        return Order.objects.filter(buyer=user)
+        #Show orders where user is buyer OR seller
+        return Order.objects.filter(
+            Q(buyer=user) | Q(seller=user)
+        ).distinct().order_by('-created_at')
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        """Create a new order"""
         data = request.data
         buyer = request.user
         seller_id = data.get('seller_id')
         order_type = data.get('order_type')
         delivery_address = data.get('delivery_address', '')
+        customer_lat = data.get('customer_lat')
+        customer_lng = data.get('customer_lng')
         payment_method = data.get('payment_method', 'cash_on_delivery')
         items_data = data.get('items', [])
 
@@ -40,6 +52,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             seller_id=seller_id,
             order_type=order_type,
             delivery_address=delivery_address,
+            customer_lat=customer_lat,
+            customer_lng=customer_lng,
             payment_method=payment_method,
             order_status=Order.IN_PROGRESS,
             payment_status=Order.UNPAID,
@@ -50,7 +64,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         for item in items_data:
             if order_type == 'product':
                 product = get_object_or_404(Product, pk=item.get('product_id'))
-                quantity = int(item.get('quantity', 1))
+                quantity = int(float(item.get('quantity', 1)))
                 if quantity > product.quantity:
                     quantity = product.quantity
                 OrderItem.objects.create(order=order, product=product, quantity=quantity, unit_price=product.price)
@@ -61,14 +75,74 @@ class OrderViewSet(viewsets.ModelViewSet):
                 if quantity > listing.quantity:
                     quantity = listing.quantity
                 OrderItem.objects.create(order=order, material_listing=listing, quantity=quantity, unit_price=listing.price_per_unit)
-                total_price += quantity * listing.price_per_unit
+                total_price += Decimal(str(quantity)) * listing.price_per_unit
 
         order.total_price = total_price
         order.save()
+        #Create initial status tracking
         OrderStatusTracking.objects.create(order=order, old_status=None, new_status=Order.IN_PROGRESS)
 
         serializer = self.get_serializer(order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['POST'], permission_classes=[IsAuthenticated])
+    @transaction.atomic
+    def confirm(self, request, pk=None):
+        """Seller confirms the order - changes status from IN_PROGRESS to CONFIRMED"""
+        order = get_object_or_404(Order, pk=pk)
+        
+        #only seller can confirm
+        if order.seller != request.user:
+            return Response({
+                'error': 'Only the seller can confirm this order'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        old_status = order.order_status
+        order.order_status = 'confirmed'
+        order.save()
+
+        OrderStatusTracking.objects.create(
+            order=order,
+            old_status=old_status,
+            new_status='confirmed'
+        )
+
+        serialzer = self.get_serializer(order)
+        return Response(serialzer.data, status=status.HTTP_200_OK)
+
+
+
+    @action(detail=True, methods=['POST'], permission_classes=[IsAuthenticated])
+    @transaction.atomic
+    def update_status(self, request, pk=None):
+        """update order status by the logistics system"""
+        order = get_object_or_404(Order, pk=pk)
+        new_status = request.data.get('status')
+
+        if not new_status:
+            return Response({
+                'detail': 'status is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        old_status = order.order_status
+        order.order_status = new_status
+
+        #if delivered set delivered_at
+        if new_status == Order.DELIVERED:
+            order.delivered_at = timezone.now()
+
+        order.save()
+
+        OrderStatusTracking.objects.create(
+            order=order,
+            old_status=old_status,
+            new_status=new_status
+        )
+
+        serializer = self.get_serializer(order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     @transaction.atomic
@@ -122,6 +196,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         OrderStatusTracking.objects.create(order=order, old_status=old_status, new_status=Order.CANCELLED)
 
+        #restore inventory
         for item in order.items.all():
             if item.product:
                 item.product.quantity = F('quantity') + item.quantity
@@ -130,7 +205,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                 item.material_listing.quantity = F('quantity') + item.quantity
                 item.material_listing.save()
 
+        #update cart items
         carts = Cart.objects.filter(items__product__in=[i.product for i in order.items.all() if i.product])
+        
         for cart in carts:
             for cart_item in cart.items.all():
                 if cart_item.product and cart_item.product.quantity < cart_item.quantity:
@@ -142,3 +219,20 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(order)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def my_orders(self, request):
+        """get current user's order as buyer"""
+        orders = Order.objects.filter(buyer=request.user).order_by('-created_at')
+        serializer = self.get_serializer(orders, many=True)
+        return Response(serializer.data)
+    
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def seller_orders(self, request):
+        """Get current user's order as seller"""
+        orders = Order.objects.filter(seller=request.user).order_by('created-at')
+        serializer = self.get_serializer(orders, many=True)
+        return Response(serializer.data)

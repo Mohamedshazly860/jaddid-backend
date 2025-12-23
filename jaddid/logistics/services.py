@@ -1,4 +1,5 @@
 import math
+from multiprocessing import Value
 import random
 from datetime import datetime, timedelta
 from django.utils import timezone
@@ -47,16 +48,20 @@ class CourierService:
         min_distance=float('inf')
 
         for courier in available_couriers:
-            distance=CourierService.calculate_distance(
-                courier.current_lat,
-                courier.current_lng,
-                order_lat,
-                order_lng
+            try:
+                distance=CourierService.calculate_distance(
+                float(courier.current_lat),
+                float(courier.current_lng),
+                float(order_lat),
+                float(order_lng)
             )
 
-            if distance < min_distance:
-                min_distance=distance
-                nearest_courier=courier
+                if distance < min_distance:
+                    min_distance=distance
+                    nearest_courier=courier
+            except (TypeError, ValueError) as e:
+                print(f"DEBUG: Distance Calculator error for courier {courier.id}: {e}")
+            
         
         return nearest_courier
     
@@ -65,33 +70,41 @@ class CourierService:
     def assign_courier_to_order(order):
         """Automatically assign nearest available courier to order
         Returns: CourierAssignment or None"""
-        order_lat = 30.0444  # Cairo latitude (example)
-        order_lng = 31.2357  # Cairo longitude (example)
+        customer_lat = getattr(order, 'customer_lat', 30.0444)
+        customer_lng = getattr(order, 'customer_lng', 31.2357)
 
         #find the nearest courier
-        courier=CourierService.find_nearest_courier(order_lat, order_lng)
+        courier=CourierService.find_nearest_courier(customer_lat, customer_lng)
 
+        
         if not courier:
+            print(f"DEBUG: No courier found for Order {order.order_id}")
             return None
         
-        #create assignment
-        assignment=CourierAssignment.objects.create(
-            order=order,
-            courier=courier,
-            accepted=True,
-            accepted_at=timezone.now()
-        )
+        print(f"DEBUG: Found courier {courier.email} for Order {order.order_id}")
+        
+        try:
+        # 3. Use update_or_create to prevent "IntegrityError" (OneToOne duplicate)
+            assignment, created = CourierAssignment.objects.update_or_create(
+                order=order,
+                defaults={
+                    'courier': courier,
+                    'accepted': True,
+                    'accepted_at': timezone.now()
+                }
+            )
 
-        #mark courier as busy
-        courier.is_active= True
-        courier.save()
+            # 4. Update order status (Matches your 'order_status' field)
+            order.order_status = 'in_progress'
+            order.save()
+            
+            print(f"DEBUG: Assignment {'created' if created else 'updated'} successfully")
+            return assignment
 
-        #update order status
-        order.status='in progress'
-        order.save()
-
-        return assignment
-    
+        except Exception as e:
+            print(f"DEBUG: Failed to create assignment: {str(e)}")
+            return None
+        
 
     @staticmethod
     def simulate_delivery_route(assignment, destination_lat, destination_lng):
@@ -111,8 +124,8 @@ class CourierService:
 
         #create tracking logs
         for step in range(steps+1):
-            current_lat=start_lat + (lat_increment * steps)
-            current_lng=start_lng + (lng_increment * steps)
+            current_lat=start_lat + (lat_increment * step)
+            current_lng=start_lng + (lng_increment * step)
 
             distance=CourierService.calculate_distance(current_lat, current_lng, destination_lat, destination_lng)
             
@@ -126,7 +139,6 @@ class CourierService:
                 latitude=current_lat,
                 longitude=current_lng,
                 distance_to_destination=distance,
-                estimated_time=estimated_time
             )
 
             #update courier current location

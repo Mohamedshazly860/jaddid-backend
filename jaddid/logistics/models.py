@@ -86,8 +86,8 @@ class CourierAssignment(models.Model):
         verbose_name_plural='Courier Assignments'
         ordering=['-assigned_at']
 
-        def __str__(self):
-            return f"Order {self.order.id} --> {self.courier.get_full_name()}"
+def __str__(self):
+    return f"Order {self.order.id} --> {self.courier.get_full_name()}"
         
 
 class LiveTracking(models.Model):
@@ -126,7 +126,7 @@ class LiveTracking(models.Model):
             models.Index(fields=['courier', '-timestamp'])
         ]
 
-        def __str__(self):
-            return f"{self.courier.get_full_name()} - {self.timestamp}"
+def __str__(self):
+    return f"{self.courier.get_full_name()} - {self.timestamp}"
         
 

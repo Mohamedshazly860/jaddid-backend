@@ -40,7 +40,9 @@ class CourierRegistrationSerializer(serializers.ModelSerializer):
             'last_name',
             'phone',
             'transport_type',
-            'vehicle_number'
+            'vehicle_number',
+            'current_lat',
+            'current_lng'
         ]
 
     def validate_email(self, email):
@@ -131,7 +133,6 @@ class LiveTrackingSerializer(serializers.ModelSerializer):
             'latitude',
             'longitude',
             'distance_to_destination',
-            'estimated_time',
             'timestamp'
         ]
         read_only_fields=['id', 'timestamp']

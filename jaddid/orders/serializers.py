@@ -1,15 +1,18 @@
+from pkg_resources import require
 from rest_framework import serializers
 from .models import Order, OrderItem, OrderStatusTracking
 from marketplace.models import Product, MaterialListing
 from django.db import transaction
-
+from accounts.models import User
 class OrderItemSerializer(serializers.ModelSerializer):
+    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), source='product', required=False, allow_null=True)
+    material_listing_id = serializers.PrimaryKeyRelatedField(queryset=MaterialListing.objects.all(), source='material_listing', required=False, allow_null=True)
     product_title = serializers.CharField(source='product.title', read_only=True)
     material_name = serializers.CharField(source='material_listing.material.name', read_only=True)
 
     class Meta:
         model = OrderItem
-        fields = ['id', 'order', 'product', 'material_listing', 'quantity', 'unit_price', 'product_title', 'material_name']
+        fields = ['id', 'order', 'product', 'material_listing', 'quantity', 'unit_price', 'product_title', 'material_name', 'product_id', 'material_listing_id']
         read_only_fields = ['unit_price', 'product_title', 'material_name', 'order']
 
     def validate(self, data):
@@ -36,6 +39,7 @@ class OrderStatusTrackingSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, required=True)
+    seller_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), source='seller')
     buyer_email = serializers.CharField(source='buyer.email', read_only=True)
     seller_email = serializers.CharField(source='seller.email', read_only=True)
     status_logs = OrderStatusTrackingSerializer(many=True, read_only=True)
@@ -43,10 +47,10 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'order_id', 'buyer', 'buyer_email', 'seller', 'seller_email',
+            'order_id', 'buyer', 'buyer_email', 'seller', 'seller_id', 'seller_email',
             'order_type', 'delivery_address', 'total_price', 'order_status',
             'payment_status', 'payment_method', 'created_at', 'updated_at',
-            'delivered_at', 'cancelled_at', 'items', 'status_logs'
+            'delivered_at', 'cancelled_at', 'items', 'status_logs', 'customer_lat', 'customer_lng'
         ]
         read_only_fields = ['total_price', 'order_status', 'payment_status', 'created_at', 'updated_at', 'delivered_at', 'cancelled_at']
         ref_name = 'OrdersOrderSerializer'
@@ -57,19 +61,20 @@ class OrderSerializer(serializers.ModelSerializer):
 
         with transaction.atomic():
             order = Order.objects.create(**validated_data)
-            total_price = 0
+            running_total = 0
             for item_data in items_data:
                 if item_data.get('product'):
-                    product = Product.objects.get(pk=item_data['product'].id)
-                    item_data['unit_price'] = product.price
+                    item_data['unit_price'] = item_data['product'].price
                 elif item_data.get('material_listing'):
-                    listing = MaterialListing.objects.get(pk=item_data['material_listing'].id)
-                    item_data['unit_price'] = listing.price_per_unit
-
+                    # listing = MaterialListing.objects.get(pk=item_data['material_listing'].id)
+                    item_data['unit_price'] = item_data['material_listing'].price_per_unit
                 OrderItem.objects.create(order=order, **item_data)
-                total_price += item_data['quantity'] * item_data['unit_price']
+                
+                qty = float(item_data.get('quantity', 0))
+                price = float(item_data.get('unit_price', 0))
+                running_total += qty * price
 
-            order.total_price = total_price
+            order.total_price = running_total
             order.save()
             OrderStatusTracking.objects.create(order=order, old_status=None, new_status=Order.IN_PROGRESS)
 

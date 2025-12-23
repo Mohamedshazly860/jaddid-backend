@@ -6,7 +6,9 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
 from yaml import serialize
-
+import threading
+import time
+from django.utils import timezone
 from orders import serializers
 from .models import Courier, CourierAssignment, LiveTracking
 from .serializers import (
@@ -209,13 +211,13 @@ def update_courier_location(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def assign_courier_to_order(request, order_id):
     """automatically assign nearest courier to order
     this is called automatically when order is created"""
-
+    print("!!!VIEW ACCESSED!!!")
     try:
-        order = Order.objects.get(id=order_id)
+        order = Order.objects.get(pk=order_id)
+        print(f"!!!FOUND ORDER: {order.order_id}!!!")
         #check if alrady assigned
         if hasattr(order, 'courier_assignment'):
             return Response({
@@ -275,37 +277,32 @@ def get_courier_assignments(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def start_delivery(request, assignment_id):
-    """start delivery simulation
-    This simulates the courier moving to destination"""
-    courier_id = request.auth.get('courier_id')
-
+    print(f"!!! STARTING DELIVERY FOR ASSIGNMENT: {assignment_id} !!!")
     try:
-        assignment = CourierAssignment(id=assignment_id, courier__id=courier_id)
+        # 1. Use pk=assignment_id to be safe with UUIDs
+        assignment = CourierAssignment.objects.get(pk=assignment_id)
+        
+        # 2. Extract destination coordinates from the order
+        # Ensure these field names match your Order model (customer_lat/lng)
+        dest_lat = getattr(assignment.order, 'customer_lat', None)
+        dest_lng = getattr(assignment.order, 'customer_lng', None)
 
-        if assignment.completed_at:
-            return Response({
-                'error': 'Delivery already completed'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if dest_lat is None or dest_lng is None:
+            return Response({"error": "Order is missing destination coordinates"}, status=400)
 
-        #Get destination coordinates (mock data)
-        destination_lat = 30.0500  # Example destination
-        destination_lng = 31.2400
-
-        #start simulation
-        CourierService.simulate_delivery_route(assignment, destination_lat, destination_lng)
+        # 3. Trigger the simulation
+        CourierService.simulate_delivery_route(assignment, dest_lat, dest_lng)
 
         return Response({
-            'message': 'Delivery Completed Successfully',
-            'order_id': str(assignment.order.id),
-            'completed_at': assignment.completed_at
+            "message": "Delivery simulation started successfully",
+            "assignment_id": assignment_id
         }, status=status.HTTP_200_OK)
-    
+
     except CourierAssignment.DoesNotExist:
-        return Response({
-            'error': 'Assignment Not Fount'
-        }, status=status.HTTP_404_NOT_FOUND)
-
-
+        return Response({"error": "Assignment not found"}, status=404)
+    except Exception as e:
+        print(f"!!! START_DELIVERY CRASH: {str(e)} !!!")
+        return Response({"error": str(e)}, status=500)
 #=======================
 #Live Tracking
 #=======================
@@ -315,10 +312,10 @@ def start_delivery(request, assignment_id):
 def get_order_tracking(request, order_id):
     """Get live tracking data for an order"""
     try:
-        order = Order.objects.get(id=order_id)
+        order = Order.objects.get(order_id=order_id)
 
-        #check if user owns this order
-        if order.user != request.user:
+        # check if requester is the buyer of this order
+        if order.buyer != request.user:
             return Response({
                 'error': "you don't have permession to review this order"
             }, status=status.HTTP_403_FORBIDDEN)
@@ -330,13 +327,12 @@ def get_order_tracking(request, order_id):
         latest = tracking_logs.first()
 
         return Response({
-            'order_id': str(order.id),
+            'order_id': str(order.pk),
             'tracking_logs': serializer.data,
             'latest_location':{
                 'latitude': latest.latitude if latest else None,
                 'longitude': latest.longitude if latest else None,
                 'distance_remaining': latest.distance_to_destination if latest else None,
-                'estimated_time': latest.estimated_time if latest else None,
                 'timestamp': latest.timestamp if latest else None
             }
         }, status=status.HTTP_200_OK)
@@ -362,3 +358,17 @@ def get_available_couriers(request):
         'count': couriers.count(),
         'couriers': serializer.data
     }, status=status.HTTP_200_OK)
+
+
+# def assign_nearest_courier(order):
+#     # Logic: Find active courier with no current assignment
+#     # This is a simple version; real apps use GeoDjango for 'nearest'
+#     available_courier = Courier.objects.filter(is_active=True).first()
+    
+#     if available_courier:
+#         assignment = CourierAssignment.objects.create(
+#             order=order,
+#             courier=available_courier
+#         )
+#         return assignment
+#     return None

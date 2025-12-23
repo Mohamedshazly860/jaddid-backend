@@ -14,14 +14,24 @@ class Order(models.Model):
         (MATERIAL, 'Material')
     ]
 
+    PENDING = 'pending'
+    CONFIRMED = 'confirmed'  
     IN_PROGRESS = 'in_progress'
-    IN_WAY = 'in_way'
+    COURIER_ASSIGNED = 'courier_assigned'
+    ON_THE_WAY = 'on_the_way'
     DELIVERED = 'delivered'
+    COMPLETED = 'completed'
     CANCELLED = 'cancelled'
+
+    
     ORDER_STATUS_CHOICES = [
+         (PENDING, 'Pending'),  # ADD THIS
+        (CONFIRMED, 'Confirmed'),  # ADD THIS
         (IN_PROGRESS, 'In Progress'),
-        (IN_WAY, 'In Way'),
+        (COURIER_ASSIGNED, 'Courier Assigned'),  # ADD THIS
+        (ON_THE_WAY, 'On the Way'),  # ADD THIS
         (DELIVERED, 'Delivered'),
+        (COMPLETED, 'Completed'),  # ADD THIS
         (CANCELLED, 'Cancelled')
     ]
 
@@ -42,8 +52,10 @@ class Order(models.Model):
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders_as_seller')
     order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES)
     delivery_address = models.TextField(blank=True)
+    customer_lat = models.FloatField(null=True, blank=True, help_text="Customer Latitude")
+    customer_lng = models.FloatField(null=True, blank=True, help_text="Customer Longitude")
     total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)
-    order_status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default=IN_PROGRESS)
+    order_status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default=PENDING)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default=UNPAID)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default=COD)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -97,7 +109,7 @@ class OrderStatusTracking(models.Model):
 
     log_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='status_logs')
-    old_status = models.CharField(max_length=20)
+    old_status = models.CharField(max_length=20, null=True, blank=True)
     new_status = models.CharField(max_length=20)
     changed_at = models.DateTimeField(auto_now_add=True)
 

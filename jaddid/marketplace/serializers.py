@@ -76,7 +76,7 @@ class MaterialImageSerializer(serializers.ModelSerializer):
 
 class MaterialListingListSerializer(serializers.ModelSerializer):
     """Material Listing List Serializer - Lightweight for list views"""
-    
+    seller = serializers.ReadOnlyField(source='seller.id')
     seller_name = serializers.CharField(source='seller.get_full_name', read_only=True)
     seller_email = serializers.EmailField(source='seller.email', read_only=True)
     material_name = serializers.CharField(source='material.name', read_only=True)
@@ -93,7 +93,7 @@ class MaterialListingListSerializer(serializers.ModelSerializer):
             'total_price', 'minimum_order_quantity', 'condition', 'status',
             'location', 'seller_name', 'seller_email', 'primary_image',
             'views_count', 'favorites_count', 'is_favorited',
-            'available_from', 'available_until', 'created_at', 'published_at'
+            'available_from', 'available_until', 'created_at', 'published_at', 'seller'
         ]
         read_only_fields = ['id', 'views_count', 'favorites_count', 'created_at', 'published_at']
     
@@ -116,6 +116,8 @@ class MaterialListingDetailSerializer(serializers.ModelSerializer):
     """Material Listing Detail Serializer - Complete information"""
     
     seller = serializers.SerializerMethodField()
+    seller_id = serializers.UUIDField(source='seller.id', read_only=True) 
+    seller_name = serializers.CharField(source='seller.get_full_name', read_only=True)
     material = MaterialSerializer(read_only=True)
     images = MaterialImageSerializer(many=True, read_only=True)
     is_favorited = serializers.SerializerMethodField()
@@ -126,7 +128,7 @@ class MaterialListingDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialListing
         fields = [
-            'id', 'seller', 'material', 'title', 'title_ar',
+            'id', 'seller','seller_id', 'seller_name', 'material', 'title', 'title_ar',
             'description', 'description_ar', 'quantity', 'unit',
             'price_per_unit', 'total_price', 'minimum_order_quantity',
             'condition', 'status', 'location', 'latitude', 'longitude',
@@ -257,6 +259,8 @@ class ProductListSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(source='seller.get_full_name', read_only=True)
     seller_email = serializers.EmailField(source='seller.email', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
+    seller_id = serializers.UUIDField(source='seller.id', read_only=True)
+    seller_name = serializers.CharField(source='seller.get_full_name', read_only=True)
     primary_image = serializers.SerializerMethodField()
     is_favorited = serializers.SerializerMethodField()
     
@@ -264,7 +268,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'title', 'title_ar', 'price', 'quantity',
-            'condition', 'status', 'location', 'seller_name', 
+            'condition', 'status', 'location','seller', 'seller_id', 'seller_name', 
             'seller_email', 'category_name', 'primary_image',
             'views_count', 'favorites_count', 'is_favorited',
             'created_at', 'published_at'
