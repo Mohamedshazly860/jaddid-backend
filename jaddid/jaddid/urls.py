@@ -55,7 +55,8 @@ urlpatterns = [
 
     #Logistics URLs
     path('api/logistics/', include('logistics.urls')),
-
+    
+    #Community URLs
     path('api/community/', include('community.urls')),
     
     #Orders urls

@@ -29,6 +29,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
+    queryset = Notification.objects.all()  # ← سطر الحل
     serializer_class = NotificationSerializer
     # permission_classes=[permissions.IsAuthenticated]
 
@@ -51,6 +52,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def mark_all_as_read(self, request):
         self.get_queryset().filter(is_read=False).update(is_read=True)
         return Response({'status': 'all notifications marked as read'})
+    
+    @action(detail=False, methods=["get"], url_path="unread_count")
+    def unread_count(self, request):
+        count = self.get_queryset().filter(is_read=False).count()
+        return Response({"unread_count": count})
 
 
 class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
