@@ -61,6 +61,9 @@ urlpatterns = [
     
     #Orders urls
     path('api/orders/', include('orders.urls')),
+    
+    # Chatbot
+    path('api/chatbot/', include('chatbot.urls')),
 
     # API Documentation
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
