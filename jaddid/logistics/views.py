@@ -328,6 +328,7 @@ def get_order_tracking(request, order_id):
 
         return Response({
             'order_id': str(order.pk),
+            'status': order.order_status,
             'tracking_logs': serializer.data,
             'latest_location':{
                 'latitude': latest.latitude if latest else None,

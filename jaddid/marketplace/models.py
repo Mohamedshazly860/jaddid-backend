@@ -208,7 +208,7 @@ class MaterialListing(models.Model):
     # Engagement Metrics
     views_count = models.PositiveIntegerField(_("Views Count"), default=0)
     favorites_count = models.PositiveIntegerField(_("Favorites Count"), default=0)
-    
+    is_active = models.BooleanField(default=True) 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -232,6 +232,10 @@ class MaterialListing(models.Model):
         if self.status == self.ACTIVE and not self.published_at:
             self.published_at = timezone.now()
         super().save(*args, **kwargs)
+    
+    def soft_delete(self):
+        self.is_active = False
+        self.save()
     
     @property
     def total_price(self):

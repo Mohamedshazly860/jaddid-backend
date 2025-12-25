@@ -104,7 +104,7 @@ class MaterialListingViewSet(viewsets.ModelViewSet):
     - Create listing (authenticated users)
     - Update/Delete (owner only)
     """
-    queryset = MaterialListing.objects.all().select_related(
+    queryset = MaterialListing.objects.filter(is_active=True).select_related(
         'seller', 'material', 'material__category'
     ).prefetch_related('images', 'reviews')
     permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]

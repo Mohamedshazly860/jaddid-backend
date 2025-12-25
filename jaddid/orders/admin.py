@@ -14,8 +14,8 @@ class OrderStatusTrackingInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['order_id', 'buyer', 'seller', 'order_status', 'payment_status', 'total_price', 'created_at']
-    list_filter = ['order_status', 'payment_status', 'payment_method', 'created_at', 'buyer', 'seller']
-    search_fields = ['order_id', 'buyer__first_name', 'buyer__last_name', 'seller__first_name', 'seller__last_name']
+    list_display = ['order_id', 'buyer', 'order_status', 'payment_status'] 
+    list_filter = ['order_status', 'order_type', 'payment_status'] # Use existing fields
+    search_fields = ['order_id', 'payment_method_id']
     inlines = [OrderItemInline, OrderStatusTrackingInline]
     readonly_fields = ['total_price', 'order_status', 'payment_status', 'created_at', 'updated_at', 'delivered_at', 'cancelled_at']

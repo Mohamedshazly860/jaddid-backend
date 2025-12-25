@@ -6,6 +6,9 @@ from django.utils import timezone
 from django.db.models import Q
 from .models import Courier, CourierAssignment, LiveTracking
 from orders.models import Order
+import threading
+import time
+
 
 class CourierService:
     """Service class for courier-related operations"""
@@ -111,53 +114,61 @@ class CourierService:
         """Simulate courier movement from current location to destination
         Creates tracking logs along the route"""
         courier=assignment.courier
+        order = assignment.order
 
-        #starting point
-        start_lat=courier.current_lat
-        start_lng=courier.current_lng
+        def run_simulation():
+            try:
+                order.order_status = 'on_the_way'
+                order.save()
 
-        steps = 10
+                start_lat = float(courier.current_lat)
+                start_lng = float(courier.current_lng)
+                dest_lat = float(destination_lat)
+                dest_lng = float(destination_lng)
 
-        #calculate increment per step
-        lat_increment=(destination_lat-start_lat) / steps
-        lng_increment=(destination_lng-start_lng) / steps
+                steps = 10
+                lat_increment = (dest_lat - start_lat) / steps
+                lng_increment = (dest_lng - start_lng) / steps
 
-        #create tracking logs
-        for step in range(steps+1):
-            current_lat=start_lat + (lat_increment * step)
-            current_lng=start_lng + (lng_increment * step)
+                for step in range(1, steps + 1):
+                    time.sleep(10)
+                    current_lat = start_lat + (lat_increment * step)
+                    current_lng = start_lng + (lng_increment * step)
 
-            distance=CourierService.calculate_distance(current_lat, current_lng, destination_lat, destination_lng)
+                    distance = CourierService.calculate_distance(
+                        current_lat, current_lng, dest_lat, dest_lng
+                    )
+
+                    LiveTracking.objects.create(
+                        order=order,
+                        courier=courier,
+                        latitude=current_lat,
+                        longitude=current_lng,
+                        distance_to_destination=round(distance, 2)
+                    )
+
+                    courier.current_lat = current_lat
+                    courier.current_lng = current_lng
+                    courier.save()
+
+                    print(f"DEBUG: Order {order.order_id} step {step}/{steps} - Dist: {distance:.2f}KM")
+
+                    order.order_status = 'delivered'
+                    order.delivered_at = timezone.now()
+                    order.save()
+
+                    assignment.completed_at = timezone.now()
+                    assignment.save()
+
+                    courier.is_active = True
+                    courier.save()
+
+                    print(f"DEBUG: order {order.order_id} Delivered Successfully!!!!")
+            except Exception as e:
+                print(f"ERROR IN THE SIMULATION {str(e)}")
             
-            # Estimate time (assuming 30 km/h average speed)
-            estimated_time=int((distance/30) * 60) #in minutes
-
-            #create tracking log
-            LiveTracking.objects.create(
-                order=assignment.order,
-                courier=courier,
-                latitude=current_lat,
-                longitude=current_lng,
-                distance_to_destination=distance,
-            )
-
-            #update courier current location
-            courier.current_lat=current_lat
-            courier.current_lng=current_lng
-            courier.save()
-
-        #mark delivery as complete
-        assignment.completed_at=timezone.now()
-        assignment.save()
-
-        #update order status
-        assignment.order.status='Delivered'
-        assignment.order.save()
-
-        #mark courier available again
-        courier.is_active= True
-        courier.save()
+        simulation_thread = threading.Thread(target=run_simulation) 
+        simulation_thread.start()
 
         return True
-    
-    
+            

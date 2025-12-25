@@ -1,5 +1,8 @@
 from pkg_resources import require
 from rest_framework import serializers
+
+from logistics.models import Courier
+from logistics.serializers import CourierSerializer
 from .models import Order, OrderItem, OrderStatusTracking
 from marketplace.models import Product, MaterialListing
 from django.db import transaction
@@ -43,13 +46,14 @@ class OrderSerializer(serializers.ModelSerializer):
     buyer_email = serializers.CharField(source='buyer.email', read_only=True)
     seller_email = serializers.CharField(source='seller.email', read_only=True)
     status_logs = OrderStatusTrackingSerializer(many=True, read_only=True)
+    courier_details = CourierSerializer(source="courier", read_only=True)
 
     class Meta:
         model = Order
         fields = [
             'order_id', 'buyer', 'buyer_email', 'seller', 'seller_id', 'seller_email',
-            'order_type', 'delivery_address', 'total_price', 'order_status',
-            'payment_status', 'payment_method', 'created_at', 'updated_at',
+            'order_type','courier_details','stripe_payment_intent_id', 'delivery_address', 'total_price', 'order_status',
+            'payment_status', 'payment_method_id', 'created_at', 'updated_at',
             'delivered_at', 'cancelled_at', 'items', 'status_logs', 'customer_lat', 'customer_lng'
         ]
         read_only_fields = ['total_price', 'order_status', 'payment_status', 'created_at', 'updated_at', 'delivered_at', 'cancelled_at']
