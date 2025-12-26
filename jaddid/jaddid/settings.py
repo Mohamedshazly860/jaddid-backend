@@ -55,7 +55,6 @@ INSTALLED_APPS = [
     'orders',
     'logistics',
     'community',
-    'apps.community',
     'chatbot',
 ]
 
