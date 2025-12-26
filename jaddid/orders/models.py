@@ -25,7 +25,7 @@ class Order(models.Model):
 
     
     ORDER_STATUS_CHOICES = [
-         (PENDING, 'Pending'),  # ADD THIS
+        (PENDING, 'Pending'),  # ADD THIS
         (CONFIRMED, 'Confirmed'),  # ADD THIS
         (IN_PROGRESS, 'In Progress'),
         (COURIER_ASSIGNED, 'Courier Assigned'),  # ADD THIS
@@ -33,18 +33,6 @@ class Order(models.Model):
         (DELIVERED, 'Delivered'),
         (COMPLETED, 'Completed'),  # ADD THIS
         (CANCELLED, 'Cancelled')
-    ]
-
-    PAID = 'paid'
-    UNPAID = 'unpaid'
-    PAYMENT_STATUS_CHOICES = [
-        (PAID, 'Paid'),
-        (UNPAID, 'Unpaid')
-    ]
-    
-    COD = 'cash_on_delivery'
-    PAYMENT_METHOD_CHOICES = [
-        (COD, 'Cash on Delivery')
     ]
 
     order_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -56,8 +44,15 @@ class Order(models.Model):
     customer_lng = models.FloatField(null=True, blank=True, help_text="Customer Longitude")
     total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)
     order_status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default=PENDING)
-    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default=UNPAID)
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default=COD)
+    payment_status = models.CharField(max_length=20,
+    choices=[
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('failed', 'Failed')
+    ], default='pending')
+    payment_method_id = models.CharField(max_length=255, null=True, blank=True)
+    stripe_payment_intent_id = models.CharField(max_length=255, null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     delivered_at = models.DateTimeField(null=True, blank=True)

@@ -9,8 +9,11 @@ django-modeltranslation==0.18.11
 Pillow==11.0.0
 drf-yasg==1.21.7
 setuptools<69.0.0
+<<<<<<< HEAD
+=======
 # AI Chatbot
 openai>=1.0.0
+>>>>>>> 2e578def100f58bf488f998ecfb6d6655797ff2e
 # Optional but recommended for production
 celery==5.3.4
 redis==5.0.1
