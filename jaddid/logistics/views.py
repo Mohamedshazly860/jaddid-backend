@@ -8,6 +8,7 @@ from django.db.models import Q
 from yaml import serialize
 import threading
 import time
+import math 
 from django.utils import timezone
 from orders import serializers
 from .models import Courier, CourierAssignment, LiveTracking
@@ -233,6 +234,10 @@ def assign_courier_to_order(request, order_id):
             }, status=status.HTTP_404_NOT_FOUND)
         
         serializer = CourierAssignmentSerializer(assignment)
+        # AUTO-START SIMULATION
+        if order.customer_lat and order.customer_lng:
+            from .services import CourierService
+            CourierService.simulate_delivery_route(assignment, order.customer_lat, order.customer_lng)
 
         return Response({
             'assignment': serializer.data,
@@ -307,6 +312,21 @@ def start_delivery(request, assignment_id):
 #Live Tracking
 #=======================
 
+def calculate_haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculate the great circle distance between two points in km"""
+    if not all([lat1, lon1, lat2, lon2]):
+        return None
+    R = 6371  # Earth radius in kilometers
+    d_lat = math.radians(float(lat2) - float(lat1))
+    d_lon = math.radians(float(lon2) - float(lon1))
+    a = (math.sin(d_lat / 2) * math.sin(d_lat / 2) +
+         math.cos(math.radians(float(lat1))) * math.cos(math.radians(float(lat2))) *
+         math.sin(d_lon / 2) * math.sin(d_lon / 2))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_order_tracking(request, order_id):
@@ -326,22 +346,47 @@ def get_order_tracking(request, order_id):
         #get latest location
         latest = tracking_logs.first()
 
+        if not latest:
+            try:
+                assignment = CourierAssignment.objects.get(order=order)
+                courier = assignment.courier
+                
+                # Calculate distance between courier and customer manually for the fallback
+                dist = calculate_haversine_distance(
+                    courier.current_lat, courier.current_lng,
+                    order.customer_lat, order.customer_lng
+                )
+                
+                return Response({
+                    'order_id': str(order.pk),
+                    'status': order.order_status,
+                    'tracking_logs': [],
+                    'latest_location': {
+                        'latitude': courier.current_lat,
+                        'longitude': courier.current_lng,
+                        'distance_remaining': round(dist, 2) if dist else None, # FIX: No longer null
+                        'timestamp': timezone.now()
+                    }
+                }, status=status.HTTP_200_OK)
+            except CourierAssignment.DoesNotExist:
+                return Response({'error': 'No courier assigned'}, status=404)
+
+        # Normal response when simulation is running
+        serializer = LiveTrackingSerializer(tracking_logs, many=True)
         return Response({
             'order_id': str(order.pk),
             'status': order.order_status,
             'tracking_logs': serializer.data,
-            'latest_location':{
-                'latitude': latest.latitude if latest else None,
-                'longitude': latest.longitude if latest else None,
-                'distance_remaining': latest.distance_to_destination if latest else None,
-                'timestamp': latest.timestamp if latest else None
+            'latest_location': {
+                'latitude': latest.latitude,
+                'longitude': latest.longitude,
+                'distance_remaining': round(latest.distance_to_destination, 2) if latest.distance_to_destination else 0,
+                'timestamp': latest.timestamp
             }
         }, status=status.HTTP_200_OK)
     
     except Order.DoesNotExist:
-        return Response({
-            'error': 'order not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'order not found'}, status=404)
     
 
 

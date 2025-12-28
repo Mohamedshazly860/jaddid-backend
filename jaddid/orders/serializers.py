@@ -1,7 +1,7 @@
 from pkg_resources import require
 from rest_framework import serializers
 
-from logistics.models import Courier
+from logistics.models import Courier, CourierAssignment
 from logistics.serializers import CourierSerializer
 from .models import Order, OrderItem, OrderStatusTracking
 from marketplace.models import Product, MaterialListing
@@ -47,6 +47,9 @@ class OrderSerializer(serializers.ModelSerializer):
     seller_email = serializers.CharField(source='seller.email', read_only=True)
     status_logs = OrderStatusTrackingSerializer(many=True, read_only=True)
     courier_details = CourierSerializer(source="courier", read_only=True)
+    courier_name = serializers.SerializerMethodField()
+    courier_assigned = serializers.SerializerMethodField()
+    assignment_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -54,7 +57,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'order_id', 'buyer', 'buyer_email', 'seller', 'seller_id', 'seller_email',
             'order_type','courier_details','stripe_payment_intent_id', 'delivery_address', 'total_price', 'order_status',
             'payment_status', 'payment_method_id', 'created_at', 'updated_at',
-            'delivered_at', 'cancelled_at', 'items', 'status_logs', 'customer_lat', 'customer_lng'
+            'delivered_at', 'cancelled_at', 'items', 'status_logs', 'customer_lat', 'customer_lng',
+            'courier_name', 'courier_assigned', 'assignment_id'
         ]
         read_only_fields = ['total_price', 'order_status', 'payment_status', 'created_at', 'updated_at', 'delivered_at', 'cancelled_at']
         ref_name = 'OrdersOrderSerializer'
@@ -83,3 +87,32 @@ class OrderSerializer(serializers.ModelSerializer):
             OrderStatusTracking.objects.create(order=order, old_status=None, new_status=Order.IN_PROGRESS)
 
         return order
+    
+    def get_courier_name(self, obj):
+        """Get courier name if assigned"""
+        try:
+            assignment = CourierAssignment.objects.get(order=obj)
+            return f"{assignment.courier.first_name} {assignment.courier.last_name}"
+        except CourierAssignment.DoesNotExist:
+            return None
+    
+    def get_courier_phone(self, obj):
+        """Get courier phone if assigned"""
+        try:
+            assignment = CourierAssignment.objects.get(order=obj)
+            return assignment.courier.phone_number
+        except CourierAssignment.DoesNotExist:
+            return None
+    
+    def get_courier_assigned(self, obj):
+        """Check if courier is assigned"""
+        return CourierAssignment.objects.filter(order=obj).exists()
+    
+    def get_assignment_id(self, obj):
+        """Get assignment ID if exists"""
+        try:
+            assignment = CourierAssignment.objects.get(order=obj)
+            return str(assignment.id)
+        except CourierAssignment.DoesNotExist:
+            return None
+

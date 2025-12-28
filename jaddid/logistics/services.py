@@ -126,7 +126,7 @@ class CourierService:
                 dest_lat = float(destination_lat)
                 dest_lng = float(destination_lng)
 
-                steps = 10
+                steps = 20
                 lat_increment = (dest_lat - start_lat) / steps
                 lng_increment = (dest_lng - start_lng) / steps
 
@@ -153,17 +153,17 @@ class CourierService:
 
                     print(f"DEBUG: Order {order.order_id} step {step}/{steps} - Dist: {distance:.2f}KM")
 
-                    order.order_status = 'delivered'
-                    order.delivered_at = timezone.now()
-                    order.save()
+                order.order_status = 'delivered'
+                order.delivered_at = timezone.now()
+                order.save()
 
-                    assignment.completed_at = timezone.now()
-                    assignment.save()
+                assignment.completed_at = timezone.now()
+                assignment.save()
 
-                    courier.is_active = True
-                    courier.save()
+                courier.is_active = True
+                courier.save()
 
-                    print(f"DEBUG: order {order.order_id} Delivered Successfully!!!!")
+                print(f"DEBUG: order {order.order_id} Delivered Successfully!!!!")
             except Exception as e:
                 print(f"ERROR IN THE SIMULATION {str(e)}")
             
