@@ -40,6 +40,8 @@ class Notification(models.Model):
     msg_en = models.TextField()
     msg_ar = models.TextField()
     is_read = models.BooleanField(default=False)
+    order_id = models.UUIDField(null=True, blank=True)
+    product_id = models.UUIDField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

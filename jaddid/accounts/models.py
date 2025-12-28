@@ -94,6 +94,7 @@ class Profile(models.Model):
         )
     average_rating=models.FloatField(default=0.0)
     review_count=models.PositiveBigIntegerField(default=0)
+    push_token = models.TextField(_("push token"), blank=True, null=True)
     created_at=models.DateTimeField(auto_now_add=True)
     updated_at=models.DateTimeField(auto_now=True)
 

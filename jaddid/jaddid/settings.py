@@ -41,12 +41,14 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne', # For ASGI server
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',  # For WebSockets
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
@@ -62,9 +64,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # CORS
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -93,6 +95,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'jaddid.wsgi.application'
+ASGI_APPLICATION = 'jaddid.asgi.application'
 
 
 # Database
@@ -110,6 +113,14 @@ DATABASES = {
             'connect_timeout': 10,
         },
     }
+}
+
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
 }
 
 
@@ -178,6 +189,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5178",   # Alternative Vite port
     "http://127.0.0.1:5173",   # Vite dev server (IP)
     "http://127.0.0.1:5178",   # Alternative Vite port (IP)
+    "http://localhost:5176",   # Current Vite port
+    "http://127.0.0.1:5176",   # Current Vite port (IP)
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -247,4 +260,14 @@ SWAGGER_SETTINGS = {
     'JSON_EDITOR': True,
 }
 
+# VAPID keys for Push Notifications
 
+VAPID_PUBLIC_KEY = "BGtJMAlAiNjNmF1l03a_AX37yXyieD_Lu9ovK_G-XlcpAOIEyrmhIHrq3S_Te2nmGtgcfEe4tSWj70r7_FqnHeQ",
+VAPID_PRIVATE_KEY =  "el9ZD-bkix9hTn_ZEM7aC7D-aRHs0W4q9_nx1n04YOs"
+VAPID_ADMIN_EMAIL = "abdelrhmanadnan3@gmail.com"
+
+
+# Stripe Configuration
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', )
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', )
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')

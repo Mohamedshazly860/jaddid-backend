@@ -17,6 +17,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'profile_image',
             'average_rating',
             'review_count',
+            'push_token',
             'created_at',
             'updated_at'
         ]
@@ -216,7 +217,8 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             'phone',
             'address',
             'bio',
-            'profile_image'
+            'profile_image',
+            'push_token'
         ]
     
     def validate_phone(self, value):

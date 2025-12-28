@@ -22,6 +22,9 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.http import JsonResponse
+from django.urls import path
+
 
 # Swagger/OpenAPI Schema
 
@@ -39,7 +42,26 @@ schema_view = get_schema_view(
    permission_classes=[permissions.AllowAny],
    
 )
+# ====================
+# Push Notification VAPID Key View
+# ====================
+def vapid_public_key(request):
+    """
+    Returns the VAPID public key for push notifications.
+    """
+    vapid_key = getattr(settings, 'VAPID_PUBLIC_KEY', None)
+    
+    if not vapid_key:
+        return JsonResponse({
+            'error': 'VAPID public key not configured'
+        }, status=500)
+    
+    return JsonResponse({
+        'public_key': vapid_key
+    })
 
+
+    
 urlpatterns = [
     path('admin/', admin.site.urls),
 
@@ -59,6 +81,9 @@ urlpatterns = [
     #Community URLs
     path('api/community/', include('community.urls')),
     
+    # Push Notifications
+    path('api/push/vapid-public-key/', vapid_public_key, name='vapid_public_key'),
+    
     #Orders urls
     path('api/orders/', include('orders.urls')),
     
@@ -75,3 +100,4 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
