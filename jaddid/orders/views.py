@@ -26,9 +26,37 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = 'order_id'
+    lookup_url_kwarg = 'order_id'
 
+    def get_queryset(self):
+        """Filter orders to only show orders where user is buyer or seller"""
+        return Order.objects.filter(
+            Q(buyer=self.request.user) | Q(seller=self.request.user)
+        ).distinct()
 
-    User = get_user_model()
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve to add logging"""
+        print(f"OrderViewSet.retrieve: pk={kwargs.get('pk')}, user={request.user}, user_id={request.user.id}")
+        queryset = self.get_queryset()
+        print(f"Filtered queryset count: {queryset.count()}")
+        try:
+            instance = self.get_object()
+            print(f"Found order: {instance}, buyer={instance.buyer}, seller={instance.seller}")
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"Error retrieving order: {e}")
+            # Try to find the order without filtering
+            try:
+                order = Order.objects.get(order_id=kwargs.get('pk'))
+                print(f"Order exists in DB: {order}, buyer={order.buyer}, seller={order.seller}")
+                print(f"User is buyer: {order.buyer == request.user}, User is seller: {order.seller == request.user}")
+            except Order.DoesNotExist:
+                print("Order does not exist in database")
+            except Exception as e2:
+                print(f"Error checking order: {e2}")
+            raise
 
     def create(self, request, *args, **kwargs):
         """Create a new order"""
