@@ -59,13 +59,13 @@ class OrderViewSet(viewsets.ModelViewSet):
             raise
 
     def create(self, request, *args, **kwargs):
-        """Create a new order"""
+        """Create a new order with service fee and delivery fee"""
         raw_data = request.data
         order_data = raw_data.get('order_data', raw_data)
-        from marketplace.models import Product, MaterialListing
+        
         try:
             with transaction.atomic():
-            # 1. Create the Main Order
+                # 1. Create the Main Order
                 order = Order.objects.create(
                     buyer=request.user,
                     seller_id=order_data.get('seller_id'),
@@ -78,46 +78,47 @@ class OrderViewSet(viewsets.ModelViewSet):
                     payment_status='paid' if order_data.get('stripe_payment_id') else 'pending'
                 )
 
-            # 2. Create Order Items
+                # 2. Create Order Items and calculate subtotal
                 items_data = order_data.get('items', [])
-                total_order_price = 0
+                subtotal = Decimal('0')
 
                 for item in items_data:
                     p_id = item.get('product_id')
                     m_id = item.get('material_listing_id')
                     qty = int(item.get('quantity', 1))
-                
-                    price = 0
+                    
+                    price = Decimal('0')
                     if p_id:
                         product = Product.objects.get(id=p_id)
                         price = product.price
                     elif m_id:
                         material = MaterialListing.objects.get(id=m_id)
                         price = material.price_per_unit
-                
-                # Create the Item with the required unit_price
+                    
+                    # Create the Item
                     OrderItem.objects.create(
                         order=order,
                         product_id=p_id,
                         material_listing_id=m_id,
                         quantity=qty,
-                        unit_price=price  # <--- FIXED: Not null anymore
+                        unit_price=price
                     )
-                
-                    total_order_price += (price * qty)
+                    
+                    subtotal += (price * qty)
 
-            # 3. Update the Order total_price field
-                order.total_price = total_order_price
+                # 3. Set subtotal and calculate fees (10% service + 20 EGP delivery)
+                order.subtotal = subtotal
+                order.calculate_fees()  # This sets service_fee, delivery_fee, and total_price
                 order.save()
 
-            order.refresh_from_db() # This pulls the new courier data into the 'order' object
-            serializer = self.get_serializer(order)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+                order.refresh_from_db()
+                serializer = self.get_serializer(order)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             print(f"CRITICAL ERROR: {str(e)}")
             return Response(
-                {'error': f"Failed to create order items: {str(e)}"}, 
+                {'error': f"Failed to create order: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -152,32 +153,37 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], permission_classes=[IsAuthenticated])
     @transaction.atomic
     def update_status(self, request, pk=None):
-        """update order status by the logistics system"""
-        """Standardized status update logic"""
         order = self.get_object()
+    
         new_status = request.data.get('status')
-        
-        # List of valid transitions can be added here
+        new_payment_status = request.data.get('payment_status') 
+    
         old_status = order.order_status
-        order.order_status = new_status
-        
-        if new_status == Order.DELIVERED:
-            order.delivered_at = timezone.now()
-            order.payment_status = 'paid' # Mark as paid if it was COD
-
-        order.save()
-        OrderStatusTracking.objects.create(order=order, old_status=old_status, new_status=new_status)
-        
+        if new_status:
+            order.order_status = new_status
+        if new_payment_status:
+            order.payment_status = new_payment_status
+        order.save() 
+        OrderStatusTracking.objects.create(
+            order=order, 
+            old_status=old_status, 
+            new_status=new_status
+    )
         return Response(self.get_serializer(order).data)
+#replaced to here
+
 
 
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     @transaction.atomic
     def buyer_update(self, request, pk=None):
+        """Buyer updates order before confirmation"""
         order = get_object_or_404(Order, pk=pk, buyer=request.user)
         if order.order_status != Order.IN_PROGRESS:
-            return Response({'detail': 'Cannot update after order is confirmed.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'detail': 'Cannot update after order is confirmed.'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         data = request.data
         delivery_address = data.get('delivery_address')
@@ -186,7 +192,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         if delivery_address:
             order.delivery_address = delivery_address
 
-        total_price = 0
+        # Recalculate subtotal
+        subtotal = Decimal('0')
         for item_data in items_data:
             item = get_object_or_404(OrderItem, pk=item_data['id'], order=order)
 
@@ -203,13 +210,16 @@ class OrderViewSet(viewsets.ModelViewSet):
 
             item.quantity = requested_qty
             item.save()
-            total_price += item.quantity * item.unit_price
+            subtotal += item.quantity * item.unit_price
 
-        order.total_price = total_price
+        # Recalculate fees
+        order.subtotal = subtotal
+        order.calculate_fees()
         order.save()
 
         serializer = self.get_serializer(order)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     @transaction.atomic

@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 from accounts.models import User
 from marketplace.models import Product, MaterialListing
+from decimal import Decimal
 
 class Order(models.Model):
     """Main Order model"""
@@ -42,7 +43,10 @@ class Order(models.Model):
     delivery_address = models.TextField(blank=True)
     customer_lat = models.FloatField(null=True, blank=True, help_text="Customer Latitude")
     customer_lng = models.FloatField(null=True, blank=True, help_text="Customer Longitude")
-    total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.0)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0.0, help_text="Sum of item prices")
+    service_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0.0, help_text="10% service fee")
+    delivery_fee = models.DecimalField(max_digits=12, decimal_places=2, default=20.0, help_text="Delivery fee (20 EGP)")
+    total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.0, help_text="Final total with all fees")    
     order_status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default=PENDING)
     payment_status = models.CharField(max_length=20,
     choices=[
@@ -66,9 +70,23 @@ class Order(models.Model):
             models.Index(fields=['order_status']),
         ]
 
+
+
     def __str__(self):
         return f"Order {self.order_id} from {self.buyer.email} to {self.seller.email}"
 
+    def calculate_fees(self):
+        """Calculate service fee (10%) and set delivery fee (20 EGP)"""
+        self.service_fee = (self.subtotal * Decimal('0.10')).quantize(Decimal('0.01'))
+        self.delivery_fee = Decimal('20.00')
+        self.total_price = self.subtotal + self.service_fee + self.delivery_fee
+
+    def save(self, *args, **kwargs):
+        if self.order_status == 'delivered':
+            self.payment_status = 'paid' if self.order_status == 'delivered' else 'unpaid'
+            if not self.delivered_at:
+                self.delivered_at = timezone.now()
+        super().save(*args, **kwargs)
 
 class OrderItem(models.Model):
     """Individual items in an order"""

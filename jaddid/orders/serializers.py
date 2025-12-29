@@ -60,7 +60,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'delivered_at', 'cancelled_at', 'items', 'status_logs', 'customer_lat', 'customer_lng',
             'courier_name', 'courier_assigned', 'assignment_id'
         ]
-        read_only_fields = ['total_price', 'order_status', 'payment_status', 'created_at', 'updated_at', 'delivered_at', 'cancelled_at']
+        read_only_fields = ['total_price', 'order_status', 'created_at', 'updated_at', 'delivered_at', 'cancelled_at']
         ref_name = 'OrdersOrderSerializer'
 
     def create(self, validated_data):

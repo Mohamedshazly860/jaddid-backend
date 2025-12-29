@@ -134,7 +134,7 @@ class MaterialListingViewSet(viewsets.ModelViewSet):
                 # Show user's own listings regardless of status
                 queryset = queryset.filter(
                     Q(status='active') | Q(seller=self.request.user)
-                )
+                ).exclude(seller=self.request.user)
         
         # Filter by price range
         min_price = self.request.query_params.get('min_price')
@@ -272,7 +272,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 # Show user's own products regardless of status
                 queryset = queryset.filter(
                     Q(status='active') | Q(seller=self.request.user)
-                )
+                ).exclude(seller=self.request.user)
         
         # Filter by price range
         min_price = self.request.query_params.get('min_price')
