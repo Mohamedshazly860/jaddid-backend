@@ -88,13 +88,35 @@ class OrderViewSet(viewsets.ModelViewSet):
                     qty = int(item.get('quantity', 1))
                     
                     price = Decimal('0')
-                    if p_id:
-                        product = Product.objects.get(id=p_id)
-                        price = product.price
-                    elif m_id:
-                        material = MaterialListing.objects.get(id=m_id)
-                        price = material.price_per_unit
+                    product_obj = None
+                    material_obj = None
                     
+                    # Get the product or material and check inventory
+                    if p_id:
+                        product_obj = Product.objects.select_for_update().get(id=p_id)
+                        price = product_obj.price
+                        
+                        # Check if enough inventory
+                        if product_obj.quantity < qty:
+                            raise ValueError(f"Insufficient stock for {product_obj.title}. Available: {product_obj.quantity}, Requested: {qty}")
+                        
+                        # Reduce inventory
+                        product_obj.quantity = F('quantity') - qty
+                        product_obj.save()
+                        product_obj.refresh_from_db()  # Get updated quantity
+                        
+                    elif m_id:
+                        material_obj = MaterialListing.objects.select_for_update().get(id=m_id)
+                        price = material_obj.price_per_unit
+                        
+                        # Check if enough inventory
+                        if material_obj.quantity < qty:
+                            raise ValueError(f"Insufficient stock for {material_obj.material.name}. Available: {material_obj.quantity}, Requested: {qty}")
+                        
+                        # Reduce inventory
+                        material_obj.quantity = F('quantity') - qty
+                        material_obj.save()
+                        material_obj.refresh_from_db()  # Get updated quantity
                     # Create the Item
                     OrderItem.objects.create(
                         order=order,
@@ -106,9 +128,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                     
                     subtotal += (price * qty)
 
-                # 3. Set subtotal and calculate fees (10% service + 20 EGP delivery)
                 order.subtotal = subtotal
-                order.calculate_fees()  # This sets service_fee, delivery_fee, and total_price
+                order.calculate_fees()  
                 order.save()
 
                 order.refresh_from_db()
@@ -170,8 +191,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             new_status=new_status
     )
         return Response(self.get_serializer(order).data)
-#replaced to here
-
 
 
 
@@ -212,7 +231,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             item.save()
             subtotal += item.quantity * item.unit_price
 
-        # Recalculate fees
         order.subtotal = subtotal
         order.calculate_fees()
         order.save()
@@ -271,7 +289,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def seller_orders(self, request):
         """Get current user's order as seller"""
-        orders = Order.objects.filter(seller=request.user).order_by('-created-at')
+        orders = Order.objects.filter(seller=request.user).order_by('-created_at')
         serializer = self.get_serializer(orders, many=True)
         return Response(serializer.data)
     

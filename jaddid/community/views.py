@@ -4,7 +4,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError  # ✅ استخدم DRF ValidationError
+from rest_framework.exceptions import ValidationError 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from accounts.serializers import ProfileSerializer
@@ -35,7 +35,6 @@ class ReviewViewSet(viewsets.ModelViewSet):
             order_id = serializer.validated_data.get('order_id')
             target_user = serializer.validated_data.get('target_user')
 
-            # ✅ التحقق من أن المستخدم لم يقيّم هذا المنتج من قبل لنفس الطلب
             if Review.objects.filter(
                 reviewer=reviewer,
                 order_id=order_id,
@@ -45,10 +44,8 @@ class ReviewViewSet(viewsets.ModelViewSet):
                     "error": "You have already reviewed this product for this order."
                 })
 
-            # ✅ حفظ الريفيو
             review = serializer.save(reviewer=reviewer)
             
-            # ✅ محاولة إرسال إشعار للبائع (لو فشل، مش مشكلة)
             try:
                 NotificationService.notify_new_review(
                     target_user=target_user,
@@ -62,10 +59,8 @@ class ReviewViewSet(viewsets.ModelViewSet):
             logger.info(f"Review created successfully by {reviewer.email} for product {product_id}")
             
         except ValidationError:
-            # ✅ إعادة رفع ValidationError كما هي
             raise
         except Exception as e:
-            # ✅ معالجة أي أخطاء غير متوقعة
             logger.error(f"Error creating review: {e}", exc_info=True)
             raise ValidationError({
                 "error": f"Failed to create review: {str(e)}"
@@ -80,7 +75,6 @@ class ReviewViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
             
-            # ✅ إرجاع البيانات بشكل صحيح
             headers = self.get_success_headers(serializer.data)
             return Response(
                 serializer.data,
@@ -98,6 +92,20 @@ class ReviewViewSet(viewsets.ModelViewSet):
                 {"error": "An unexpected error occurred. Please try again."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+    @action(detail=False, methods=['get'], url_path='product/(?P<product_id>[^/.]+)')
+    def for_product(self, request, product_id=None):
+        """Action for URL: /api/community/reviews/product/{id}/"""
+        reviews = self.get_queryset().filter(product_id=product_id)
+        serializer = self.get_serializer(reviews, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='material-listing/(?P<material_id>[^/.]+)')
+    def for_material(self, request, material_id=None):
+        """Action for URL: /api/community/reviews/material-listing/{id}/"""
+        reviews = self.get_queryset().filter(product_id=material_id)
+        serializer = self.get_serializer(reviews, many=True)
+        return Response(serializer.data)
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
@@ -135,6 +143,6 @@ class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'])
     def top_rated(self, request):
         "returns top sellers with at least 1 review"
-        top_sellers = self.get_queryset()[:10]
+        top_sellers = self.get_queryset()[:5]
         serializer = self.get_serializer(top_sellers, many=True)
         return Response(serializer.data)

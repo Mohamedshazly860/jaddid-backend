@@ -131,7 +131,7 @@ class CourierService:
                 lng_increment = (dest_lng - start_lng) / steps
 
                 for step in range(1, steps + 1):
-                    time.sleep(10)
+                    time.sleep(5)
                     current_lat = start_lat + (lat_increment * step)
                     current_lng = start_lng + (lng_increment * step)
 

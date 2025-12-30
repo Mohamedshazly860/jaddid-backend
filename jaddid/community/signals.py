@@ -42,8 +42,8 @@ def update_user_review_stats(sender, instance, created, **kwargs):
             type=Notification.SYSTEM,
             title_en="New Review Received",
             title_ar="تم استلام تقييم جديد",
-            msg_en=f"User {instance.reviewer} gave you a {instance.rating}/10 rating.",
-            msg_ar=f"قام المستخدم {instance.reviewer} بتقييمك بمعدل {instance.rating}/10.",
+            msg_en=f"User {instance.reviewer} gave you a {instance.rating}/5 rating.",
+            msg_ar=f"قام المستخدم {instance.reviewer} بتقييمك بمعدل {instance.rating}/5.",
             is_read=False
         )
 

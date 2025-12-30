@@ -125,15 +125,15 @@ class ReviewSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.CharField(source='reviewer.get_full_name', read_only=True)
     target_user = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
-        required=True,  # ✅ تغيير: مطلوب دائماً
-        allow_null=False  # ✅ تغيير: لا يقبل null
+        required=True, 
+        allow_null=False 
     )
 
     class Meta:
         model = Review
         fields = [
             'id', 'reviewer', 'reviewer_name', 'target_user',
-            'order_id', 'product_id', 'rating', 'comment', 'created_at'
+            'order_id', 'product_id', 'rating', 'comment', 'created_at', 'product_id'
         ]
         read_only_fields = ('reviewer', 'reviewer_name', 'created_at')
         ref_name = "CommunityReview"
@@ -145,25 +145,22 @@ class ReviewSerializer(serializers.ModelSerializer):
         target_user = attrs.get("target_user")
         rating = attrs.get("rating")
 
-        # ✅ التحقق من order_id
         if not order_id:
             raise serializers.ValidationError({
                 "order_id": "Order ID is required to create a review."
             })
 
-        # ✅ التحقق من product_id
         if not product_id:
             raise serializers.ValidationError({
                 "product_id": "Product ID is required to create a review."
             })
 
-        # ✅ التحقق من target_user
+
         if not target_user:
             raise serializers.ValidationError({
                 "target_user": "Target user (seller) is required to create a review."
             })
 
-        # ✅ التحقق من rating
         if rating is not None and (rating < 1 or rating > 5):
             raise serializers.ValidationError({
                 "rating": "Rating must be between 1 and 5."
@@ -174,7 +171,6 @@ class ReviewSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create review with proper error handling"""
         try:
-            # إنشاء الريفيو
             review = Review.objects.create(**validated_data)
             return review
         except Exception as e:
