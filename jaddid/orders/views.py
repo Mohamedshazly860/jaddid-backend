@@ -31,8 +31,15 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter orders to only show orders where user is buyer or seller"""
+        # return Order.objects.filter(
+        #     Q(buyer=self.request.user) | Q(seller=self.request.user)
+        # ).distinct()
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Order.objects.all()
+        
         return Order.objects.filter(
-            Q(buyer=self.request.user) | Q(seller=self.request.user)
+        Q(buyer=self.request.user) | Q(seller=self.request.user)
         ).distinct()
 
     def retrieve(self, request, *args, **kwargs):
